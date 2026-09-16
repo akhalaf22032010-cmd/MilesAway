@@ -43,12 +43,11 @@ export default {
             return;
         }
 
-    const targetUser = interaction.options.getUser("user");
+        const targetUser = interaction.options.getUser("user");
         const message = interaction.options.getString("message");
         const anonymous = interaction.options.getBoolean("anonymous") || false;
 
         try {
-            
             if (message.length > 2000) {
                 return await replyUserError(interaction, { type: ErrorTypes.UNKNOWN, message: 'Messages must be under 2000 characters.' });
             }
@@ -58,9 +57,8 @@ export default {
             }
 
             const sanitized = sanitizeMarkdown(message);
-
             const dmChannel = await targetUser.createDM();
-            
+
             await dmChannel.send({
                 embeds: [
                     successEmbed(
@@ -99,11 +97,9 @@ export default {
             });
         } catch (error) {
             logger.error('DM command error:', error);
-            
-if (error.code === 50007) {
+            if (error.code === 50007) {
                 return await replyUserError(interaction, { type: ErrorTypes.UNKNOWN, message: `Could not send a DM to ${targetUser.tag}. They may have DMs disabled.` });
             }
-            
             return await replyUserError(interaction, { type: ErrorTypes.UNKNOWN, message: `Failed to send DM: ${error.message}` });
         }
     }

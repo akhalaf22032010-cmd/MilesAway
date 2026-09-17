@@ -12,109 +12,142 @@ const COMMAND_COUNT_WARN_THRESHOLD = 90;
 
 function getSubcommandInfo(commandData) {
     const subcommands = [];
-    
     if (commandData.options) {
         for (const option of commandData.options) {
-            if (option.type === 1) {
-                subcommands.push(option.name);
-            } else if (option.type === 2) {
-                if (option.options) {
-                    for (const subOption of option.options) {
-                        if (subOption.type === 1) {
-                            subcommands.push(`${option.name}/${subOption.name}`);
-                        }
-                    }
+            if (option.type === 1) subcommands.push(option.name);
+            else if (option.type === 2 && option.options) {
+                for (const subOption of option.options) {
+                    if (subOption.type === 1) subcommands.push(`${option.name}/${subOption.name}`);
                 }
             }
         }
     }
-    
     return subcommands;
 }
 
 async function getAllFiles(directory, fileList = []) {
     const files = await fs.readdir(directory, { withFileTypes: true });
-    
     for (const file of files) {
         const filePath = path.join(directory, file.name);
-        
         if (file.isDirectory()) {
-            if (file.name === 'modules') {
-                continue;
-            }
+            if (file.name === 'modules') continue;
             await getAllFiles(filePath, fileList);
-        } else if (file.name.endsWith('.js')) {
-            fileList.push(filePath);
-        }
+        } else if (file.name.endsWith('.js')) fileList.push(filePath);
     }
-    
     return fileList;
+}
+
+function groupTicketCommands(client) {
+    const ticket = client.commands.get('ticket');
+    const claim = client.commands.get('claim');
+    const close = client.commands.get('close');
+    const priority = client.commands.get('priority');
+
+    if (!ticket || !claim || !close || !priority) return;
+
+    const originalTicketExecute = ticket.execute;
+
+    ticket.data.setDefaultMemberPermissions(null)
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('claim')
+                .setDescription('Claims an open ticket, assigning it to you.')
+        )
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('close')
+                .setDescription('Closes the current ticket.')
+                .addStringOption(option =>
+                    option
+                        .setName('reason')
+                        .setDescription('The reason for closing the ticket.')
+                        .setRequired(false)
+                )
+        )
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('priority')
+                .setDescription('Sets the priority level for the current support ticket.')
+                .addStringOption(option =>
+                    option
+                        .setName('level')
+                        .setDescription('The priority level for the ticket.')
+                        .setRequired(true)
+                        .addChoices(
+                            { name: 'Urgent', value: 'urgent' },
+                            { name: 'High', value: 'high' },
+                            { name: 'Medium', value: 'medium' },
+                            { name: 'Low', value: 'low' },
+                            { name: 'None', value: 'none' },
+                        )
+                )
+        );
+
+    ticket.execute = async (interaction, config, clientInstance) => {
+        const subcommand = interaction.options.getSubcommand(false);
+        if (subcommand === 'claim') return claim.execute(interaction, config, clientInstance);
+        if (subcommand === 'close') return close.execute(interaction, config, clientInstance);
+        if (subcommand === 'priority') return priority.execute(interaction, config, clientInstance);
+        return originalTicketExecute(interaction, config, clientInstance);
+    };
+
+    client.commands.delete('claim');
+    client.commands.delete('close');
+    client.commands.delete('priority');
+
+    logger.info('Grouped ticket commands into /ticket: claim, close, priority');
 }
 
 export async function loadCommands(client) {
     client.commands = new Collection();
     const commandsPath = path.join(__dirname, '../../commands');
     const commandFiles = await getAllFiles(commandsPath);
-    
+
     logger.info(`Found ${commandFiles.length} command files to load`);
-    
     const uniqueCommandNames = new Set();
-    
+
     for (const filePath of commandFiles) {
         try {
             const normalizedPath = filePath.replace(/\\/g, '/');
             const commandName = path.basename(filePath, '.js');
             const commandDir = path.dirname(filePath);
             const category = path.basename(commandDir);
-            
             const commandModule = await import(`file://${filePath}`);
             const command = commandModule.default || commandModule;
-            
+
             if (!command.data || !command.execute) {
                 logger.warn(`Command at ${filePath} is missing required "data" or "execute" property.`);
                 continue;
             }
-            
+
             command.category = category;
             command.filePath = normalizedPath;
-            
             const primaryCommandName = command.data.name;
-            
+
             if (!uniqueCommandNames.has(primaryCommandName)) {
                 uniqueCommandNames.add(primaryCommandName);
                 client.commands.set(primaryCommandName, command);
             }
-            
+
             const subcommands = getSubcommandInfo(command.data.toJSON());
-            
             logger.info(`Loaded command: ${primaryCommandName} from ${normalizedPath} (category: ${category})`);
-            
-            if (subcommands.length > 0) {
-                logger.info(`  - Subcommands: ${subcommands.join(', ')}`);
-            }
-            
+            if (subcommands.length > 0) logger.info(`  - Subcommands: ${subcommands.join(', ')}`);
         } catch (error) {
             logger.error(`Error loading command from ${filePath}:`, error);
         }
     }
-    
-    const commandsWithSubcommands = Array.from(client.commands.values()).filter(cmd => {
-        const subcommands = getSubcommandInfo(cmd.data.toJSON());
-        return subcommands.length > 0;
-    });
-    
-    const totalSubcommands = commandsWithSubcommands.reduce((total, cmd) => {
-        return total + getSubcommandInfo(cmd.data.toJSON()).length;
-    }, 0);
-    
+
+    groupTicketCommands(client);
+
+    const commandsWithSubcommands = Array.from(client.commands.values()).filter(cmd => getSubcommandInfo(cmd.data.toJSON()).length > 0);
+    const totalSubcommands = commandsWithSubcommands.reduce((total, cmd) => total + getSubcommandInfo(cmd.data.toJSON()).length, 0);
     const uniqueCommands = new Set();
     for (const [name, command] of client.commands.entries()) {
-        if (command.data && command.data.name) {
-            uniqueCommands.add(command.data.name);
-        }
+        if (command.data && command.data.name) uniqueCommands.add(command.data.name);
     }
-    
+
     logger.info(`Loaded ${uniqueCommands.size} commands`);
+    logger.info(`Total registered subcommands: ${totalSubcommands}`);
     return client.commands;
 }
 
@@ -122,116 +155,55 @@ function collectCommandPayloads(client) {
     const commands = [];
     let totalSubcommands = 0;
     const registeredNames = new Set();
-
     for (const command of client.commands.values()) {
         if (!command.data || typeof command.data.toJSON !== 'function') {
             logger.warn(`Command missing data or toJSON method: ${command}`);
             continue;
         }
-
         const commandName = command.data.name;
-        logger.debug(`Processing command for registration: ${commandName}`);
-
-        if (registeredNames.has(commandName)) {
-            logger.debug(`Skipping duplicate command: ${commandName}`);
-            continue;
-        }
-
+        if (registeredNames.has(commandName)) continue;
         registeredNames.add(commandName);
         const commandJson = command.data.toJSON();
         commands.push(commandJson);
         totalSubcommands += getSubcommandInfo(commandJson).length;
-
-        if (process.env.NODE_ENV !== 'production') {
-            logger.debug(`Registering command: ${commandName}`);
-        }
     }
-
     return { commands, totalSubcommands };
 }
 
 function validateCommands(commands) {
     const validationErrors = [];
-
     for (const cmd of commands) {
-        if (cmd.name && cmd.name.length > 32) {
-            validationErrors.push(`Command ${cmd.name} has name longer than 32 chars: "${cmd.name}" (${cmd.name.length} chars)`);
-        }
-        if (cmd.description && cmd.description.length > 110) {
-            validationErrors.push(`Command ${cmd.name} has description longer than 110 chars: "${cmd.description}" (${cmd.description.length} chars)`);
-        }
-
-        if (!cmd.options) {
-            continue;
-        }
-
+        if (cmd.name && cmd.name.length > 32) validationErrors.push(`Command ${cmd.name} has name longer than 32 chars`);
+        if (cmd.description && cmd.description.length > 110) validationErrors.push(`Command ${cmd.name} has description longer than 110 chars`);
+        if (!cmd.options) continue;
         for (const option of cmd.options) {
-            if (option.name && option.name.length > 32) {
-                validationErrors.push(`Command ${cmd.name} option ${option.name} has name longer than 32 chars: "${option.name}" (${option.name.length} chars)`);
+            if (option.name && option.name.length > 32) validationErrors.push(`Command ${cmd.name} option ${option.name} has name longer than 32 chars`);
+            if (option.description && option.description.length > 110) validationErrors.push(`Command ${cmd.name} option ${option.name} has description longer than 110 chars`);
+            if (option.choices) for (const choice of option.choices) {
+                if (choice.name && choice.name.length > 110) validationErrors.push(`Command ${cmd.name} option ${option.name} choice has name longer than 110 chars`);
+                if (choice.value && choice.value.length > 100) validationErrors.push(`Command ${cmd.name} option ${option.name} choice has value longer than 100 chars`);
             }
-            if (option.description && option.description.length > 110) {
-                validationErrors.push(`Command ${cmd.name} option ${option.name} has description longer than 110 chars: "${option.description}" (${option.description.length} chars)`);
-            }
-
-            if (option.choices) {
-                for (const choice of option.choices) {
-                    if (choice.name && choice.name.length > 110) {
-                        validationErrors.push(`Command ${cmd.name} option ${option.name} choice ${choice.name} has name longer than 110 chars: "${choice.name}" (${choice.name.length} chars)`);
-                    }
-                    if (choice.value && choice.value.length > 100) {
-                        validationErrors.push(`Command ${cmd.name} option ${option.name} choice ${choice.name} has value longer than 100 chars: "${choice.name}" (${choice.name.length} chars)`);
-                    }
-                }
-            }
-
-            if (!option.options) {
-                continue;
-            }
-
+            if (!option.options) continue;
             for (const subOption of option.options) {
-                if (subOption.name && subOption.name.length > 32) {
-                    validationErrors.push(`Command ${cmd.name} subcommand ${option.name} option ${subOption.name} has name longer than 32 chars: "${subOption.name}" (${subOption.name.length} chars)`);
-                }
-                if (subOption.description && subOption.description.length > 110) {
-                    validationErrors.push(`Command ${cmd.name} subcommand ${option.name} option ${subOption.name} has description longer than 110 chars: "${subOption.description}" (${subOption.description.length} chars)`);
-                }
-
-                if (!subOption.choices) {
-                    continue;
-                }
-
-                for (const choice of subOption.choices) {
-                    if (choice.name && choice.name.length > 110) {
-                        validationErrors.push(`Command ${cmd.name} subcommand ${option.name} subcommand ${subOption.name} choice ${choice.name} has name longer than 110 chars: "${choice.name}" (${choice.name.length} chars)`);
-                    }
-                    if (choice.value && choice.value.length > 100) {
-                        validationErrors.push(`Command ${cmd.name} subcommand ${option.name} subcommand ${subOption.name} choice ${choice.name} has value longer than 100 chars: "${choice.name}" (${choice.name.length} chars)`);
-                    }
-                }
+                if (subOption.name && subOption.name.length > 32) validationErrors.push(`Command ${cmd.name} subcommand ${option.name} option ${subOption.name} has name longer than 32 chars`);
+                if (subOption.description && subOption.description.length > 110) validationErrors.push(`Command ${cmd.name} subcommand ${option.name} option ${subOption.name} has description longer than 110 chars`);
             }
         }
     }
-
     if (validationErrors.length > 0) {
         logger.error('Command validation failed. Errors:');
-        validationErrors.forEach((error) => logger.error(`  - ${error}`));
+        validationErrors.forEach(error => logger.error(`  - ${error}`));
         throw new Error(`Command validation failed with ${validationErrors.length} errors`);
     }
 }
 
 function prepareCommandsForRegistration(commands) {
-    if (commands.length >= COMMAND_COUNT_WARN_THRESHOLD) {
-        logger.warn(`Command count (${commands.length}) is near Discord's ${MAX_COMMANDS} global command limit`);
-    }
-
-    if (commands.length <= MAX_COMMANDS) {
-        return commands;
-    }
-
+    if (commands.length >= COMMAND_COUNT_WARN_THRESHOLD) logger.warn(`Command count (${commands.length}) is near Discord's ${MAX_COMMANDS} global command limit`);
+    if (commands.length <= MAX_COMMANDS) return commands;
     logger.warn(`Command count (${commands.length}) exceeds Discord limit (${MAX_COMMANDS}), truncating...`);
     const priorityNames = new Set(['say', 'react', 'remind']);
-    const priorityCommands = commands.filter((command) => priorityNames.has(command.name));
-    const otherCommands = commands.filter((command) => !priorityNames.has(command.name));
+    const priorityCommands = commands.filter(command => priorityNames.has(command.name));
+    const otherCommands = commands.filter(command => !priorityNames.has(command.name));
     const truncated = [...priorityCommands, ...otherCommands].slice(0, MAX_COMMANDS);
     logger.info(`Truncated to ${truncated.length} commands for registration; /say, /react, and /remind were prioritized`);
     return truncated;
@@ -256,21 +228,12 @@ async function registerCommandsToGuild(client, guildId, commands) {
 }
 
 export async function registerCommands(client, options = {}) {
-    const { clientId = null } = options;
-
     try {
         const { commands } = collectCommandPayloads(client);
-        if (!commands.length) {
-            throw new Error('No slash commands were loaded from src/commands');
-        }
-
+        if (!commands.length) throw new Error('No slash commands were loaded from src/commands');
         const guilds = Array.from(client.guilds.cache.values());
-        if (!guilds.length) {
-            throw new Error('Bot is not currently in any guilds');
-        }
-
+        if (!guilds.length) throw new Error('Bot is not currently in any guilds');
         logger.info(`Registering slash commands to all ${guilds.length} guild(s) the bot is in...`);
-
         for (const guild of guilds) {
             try {
                 await registerCommandsToGuild(client, guild.id, commands);
@@ -278,7 +241,6 @@ export async function registerCommands(client, options = {}) {
                 logger.error(`Failed to register commands in guild ${guild.id} (${guild.name}):`, error);
             }
         }
-
         await clearGlobalCommands(client);
         logger.info(`Slash commands registered across all ${guilds.length} guild(s).`);
     } catch (error) {
@@ -289,20 +251,13 @@ export async function registerCommands(client, options = {}) {
 
 export async function reloadCommand(client, commandName) {
     const command = client.commands.get(commandName);
-    
-    if (!command) {
-        return { success: false, message: `Command "${commandName}" not found` };
-    }
-    
+    if (!command) return { success: false, message: `Command "${commandName}" not found` };
     try {
         const commandPath = path.resolve(command.filePath);
         const moduleUrl = pathToFileURL(commandPath);
         moduleUrl.searchParams.set('t', Date.now().toString());
-
         const newCommand = (await import(moduleUrl.href)).default;
-        
         client.commands.set(commandName, newCommand);
-        
         logger.info(`Reloaded command: ${commandName}`);
         return { success: true, message: `Successfully reloaded command "${commandName}"` };
     } catch (error) {

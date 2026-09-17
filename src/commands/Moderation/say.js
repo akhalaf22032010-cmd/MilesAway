@@ -32,13 +32,19 @@ function resolveTargetChannel(interaction) {
 export default {
     data: new SlashCommandBuilder()
         .setName('say')
-        .setDescription('Send a plain message as the bot')
+        .setDescription('Send a message or image as the bot')
         .addStringOption((option) =>
             option
                 .setName('message')
                 .setDescription('The message the bot should send')
-                .setRequired(true)
+                .setRequired(false)
                 .setMaxLength(2000),
+        )
+        .addAttachmentOption((option) =>
+            option
+                .setName('image')
+                .setDescription('An image to send with the message')
+                .setRequired(false),
         )
         .addChannelOption((option) =>
             option
@@ -66,12 +72,20 @@ export default {
         }
 
         const rawMessage = interaction.options.getString('message');
-        const message = sanitizeInput(rawMessage, 2000);
+        const message = rawMessage ? sanitizeInput(rawMessage, 2000) : '';
+        const image = interaction.options.getAttachment('image');
 
-        if (!message) {
+        if (!message && !image) {
             return replyUserError(interaction, {
                 type: ErrorTypes.VALIDATION,
-                message: 'Message cannot be empty.',
+                message: 'You must provide a message, an image, or both.',
+            });
+        }
+
+        if (image && !image.contentType?.startsWith('image/')) {
+            return replyUserError(interaction, {
+                type: ErrorTypes.VALIDATION,
+                message: 'The attachment must be an image.',
             });
         }
 
@@ -100,7 +114,16 @@ export default {
             });
         }
 
-        const sentMessage = await channel.send({ content: message });
+        const payload = {};
+        if (message) payload.content = message;
+        if (image) {
+            payload.files = [{
+                attachment: image.url,
+                name: image.name,
+            }];
+        }
+
+        const sentMessage = await channel.send(payload);
 
         await logEvent({
             client,
@@ -109,14 +132,17 @@ export default {
                 action: 'Bot Message Sent',
                 target: `${channel} (${channel.id})`,
                 executor: `${interaction.user.tag} (${interaction.user.id})`,
-                reason: message.length > 200
-                    ? `${message.slice(0, 197)}...`
-                    : message,
+                reason: message
+                    ? message.length > 200
+                        ? `${message.slice(0, 197)}...`
+                        : message
+                    : '[image]',
                 metadata: {
                     channelId: channel.id,
                     messageId: sentMessage.id,
                     moderatorId: interaction.user.id,
                     messageLength: message.length,
+                    hasImage: Boolean(image),
                 },
             },
         });

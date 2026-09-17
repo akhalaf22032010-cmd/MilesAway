@@ -90,11 +90,6 @@ function collectCommandPayloads(client) {
         registeredNames.add(commandName);
 
         const commandJson = command.data.toJSON();
-
-        // Always make commands discoverable to members. Actual command
-        // authorization is still enforced by permissionGuard/execute logic.
-        delete commandJson.default_member_permissions;
-
         commands.push(commandJson);
         totalSubcommands += getSubcommandInfo(commandJson).length;
     }
@@ -105,7 +100,7 @@ function validateCommands(commands) {
     const validationErrors = [];
     for (const cmd of commands) {
         if (cmd.name && cmd.name.length > 32) validationErrors.push(`Command ${cmd.name} has name longer than 32 chars: "${cmd.name}" (${cmd.name.length} chars)`);
-        if (cmd.description && cmd.description.length > 110) validationErrors.push(`Command ${cmd.name} has description longer than 110 chars: "${cmd.name}" (${cmd.description.length} chars)`);
+        if (cmd.description && cmd.description.length > 110) validationErrors.push(`Command ${cmd.name} has description longer than 110 chars: "${cmd.name}" (${cmd.name.length} chars)`);
         if (!cmd.options) continue;
         for (const option of cmd.options) {
             if (option.name && option.name.length > 32) validationErrors.push(`Command ${cmd.name} option ${option.name} has name longer than 32 chars: "${option.name}" (${option.name.length} chars)`);

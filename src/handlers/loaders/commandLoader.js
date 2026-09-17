@@ -37,13 +37,15 @@ async function getAllFiles(directory, fileList = []) {
     return fileList;
 }
 
-function groupTicketCommands(client) {
+async function groupTicketCommands(client) {
     const ticket = client.commands.get('ticket');
-    const claim = client.commands.get('claim');
-    const close = client.commands.get('close');
-    const priority = client.commands.get('priority');
+    if (!ticket) return;
 
-    if (!ticket || !claim || !close || !priority) return;
+    // Ticket action handlers live in modules/ so they do not consume
+    // top-level Discord command slots. Load them directly for execution.
+    const claim = (await import('../../commands/Ticket/modules/ticket_claim.js')).default;
+    const close = (await import('../../commands/Ticket/modules/ticket_close.js')).default;
+    const priority = (await import('../../commands/Ticket/modules/ticket_priority.js')).default;
 
     const originalTicketExecute = ticket.execute;
 
@@ -91,10 +93,6 @@ function groupTicketCommands(client) {
         return originalTicketExecute(interaction, config, clientInstance);
     };
 
-    client.commands.delete('claim');
-    client.commands.delete('close');
-    client.commands.delete('priority');
-
     logger.info('Grouped ticket commands into /ticket: claim, close, priority');
 }
 
@@ -137,7 +135,7 @@ export async function loadCommands(client) {
         }
     }
 
-    groupTicketCommands(client);
+    await groupTicketCommands(client);
 
     const commandsWithSubcommands = Array.from(client.commands.values()).filter(cmd => getSubcommandInfo(cmd.data.toJSON()).length > 0);
     const totalSubcommands = commandsWithSubcommands.reduce((total, cmd) => total + getSubcommandInfo(cmd.data.toJSON()).length, 0);

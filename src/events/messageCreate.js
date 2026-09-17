@@ -309,7 +309,7 @@ async function handleLeveling(message, client) {
       finalXP = Math.floor(finalXP * levelingConfig.xpMultiplier);
     }
 
-    const result = await addXp(message.client, message.guild, message.member, finalXP);
+    const result = await addXp(client, message.guild, message.member, finalXP);
 
     if (result?.leveledUp) {
       logger.info(

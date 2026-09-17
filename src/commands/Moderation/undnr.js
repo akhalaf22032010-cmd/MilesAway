@@ -1,48 +1,49 @@
-import { SlashCommandBuilder, MessageFlags } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { clearDnr, removeDnr } from '../../services/moderation/dnrService.js';
+
+function dnrEmbed(title, description) {
+  return new EmbedBuilder().setTitle(title).setDescription(description);
+}
 
 export default {
   data: new SlashCommandBuilder()
     .setName('undnr')
     .setDescription('Remove a DNR from a user')
-    .addSubcommand((subcommand) =>
-      subcommand
-        .setName('user')
-        .setDescription('UNDNR a user')
-        .addUserOption((option) =>
-          option.setName('user').setDescription('The user to UNDNR').setRequired(true),
-        ),
+    .addStringOption((option) =>
+      option
+        .setName('action')
+        .setDescription('Use all to clear your entire DNR list')
+        .setRequired(false)
+        .addChoices({ name: 'all', value: 'all' }),
     )
-    .addSubcommand((subcommand) =>
-      subcommand
-        .setName('all')
-        .setDescription('Clear everyone from your DNR list'),
+    .addUserOption((option) =>
+      option.setName('user').setDescription('The user to UNDNR').setRequired(false),
     )
     .setDMPermission(false),
   category: 'moderation',
 
   async execute(interaction) {
-    const subcommand = interaction.options.getSubcommand();
+    const action = interaction.options.getString('action');
+    const target = interaction.options.getUser('user');
 
-    if (subcommand === 'all') {
+    if (action === 'all') {
       clearDnr(interaction.guild.id, interaction.user.id);
       return InteractionHelper.safeReply(interaction, {
-        embeds: [{
-          title: '🧹 You cleared your DNR list',
-          description: '**Your dnr list is now 0 people**',
-        }],
+        embeds: [dnrEmbed('🧹 You cleared your DNR list', '**Your dnr list is now 0 people**')],
       });
     }
 
-    const target = interaction.options.getUser('user', true);
+    if (!target) {
+      return InteractionHelper.safeReply(interaction, {
+        embeds: [dnrEmbed('❌ Missing user', 'Use `/undnr @user` or `/undnr all`.')],
+      });
+    }
+
     removeDnr(interaction.guild.id, interaction.user.id, target.id);
 
     return InteractionHelper.safeReply(interaction, {
-      embeds: [{
-        title: '↩️ You UNDNRED ' + target.username,
-        description: '**They can now ping/reply to you**',
-      }],
+      embeds: [dnrEmbed(`↩️ You UNDNRED ${target.username}`, '**They can now ping/reply to you**')],
     });
   },
 };

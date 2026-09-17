@@ -113,7 +113,7 @@ async function sendLevelUpAnnouncement(guild, member, levelData, config) {
   try {
     const levelUpChannel = config.levelUpChannel
       ? guild.channels.cache.get(config.levelUpChannel)
-      : guild.channels.cache.get('1530914065655009434');
+      : guild.systemChannel;
 
     if (!levelUpChannel || !levelUpChannel.isTextBased()) {
       return;

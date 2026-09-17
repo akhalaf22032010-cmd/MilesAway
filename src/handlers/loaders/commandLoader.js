@@ -207,7 +207,7 @@ function validateCommands(commands) {
                         validationErrors.push(`Command ${cmd.name} subcommand ${option.name} option ${subOption.name} choice ${choice.name} has name longer than 110 chars: "${choice.name}" (${choice.name.length} chars)`);
                     }
                     if (choice.value && choice.value.length > 100) {
-                        validationErrors.push(`Command ${cmd.name} subcommand ${option.name} option ${subOption.name} choice ${choice.name} has value longer than 100 chars: "${choice.value}" (${choice.value.length} chars)`);
+                        validationErrors.push(`Command ${cmd.name} subcommand ${option.name} choice ${choice.name} has value longer than 100 chars: "${choice.value}" (${choice.value.length} chars)`);
                     }
                 }
             }
@@ -231,18 +231,8 @@ function prepareCommandsForRegistration(commands) {
     }
 
     logger.warn(`Command count (${commands.length}) exceeds Discord limit (${MAX_COMMANDS}), truncating...`);
-
-    // Keep /sayimage registered even when the project has more than Discord's
-    // 100-command global limit. Without this, alphabetical filesystem loading
-    // can place /sayimage outside the first 100 commands and it never appears.
-    const priorityCommands = commands.filter((command) => command.name === 'sayimage');
-    const otherCommands = commands.filter((command) => command.name !== 'sayimage');
-    const truncated = [...priorityCommands, ...otherCommands].slice(0, MAX_COMMANDS);
-
+    const truncated = commands.slice(0, MAX_COMMANDS);
     logger.info(`Truncated to ${truncated.length} commands for registration`);
-    if (priorityCommands.length > 0) {
-        logger.info('Preserved /sayimage while truncating the command list');
-    }
     return truncated;
 }
 

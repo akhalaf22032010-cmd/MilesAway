@@ -9,6 +9,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const MAX_COMMANDS = 100;
 const COMMAND_COUNT_WARN_THRESHOLD = 90;
+const TARGET_GUILD_ID = '1530914065147363378';
 
 function getSubcommandInfo(commandData) {
     const subcommands = [];
@@ -207,7 +208,7 @@ function validateCommands(commands) {
                         validationErrors.push(`Command ${cmd.name} subcommand ${option.name} option ${subOption.name} choice ${choice.name} has name longer than 110 chars: "${choice.name}" (${choice.name.length} chars)`);
                     }
                     if (choice.value && choice.value.length > 100) {
-                        validationErrors.push(`Command ${cmd.name} subcommand ${option.name} choice ${choice.name} has value longer than 100 chars: "${choice.value}" (${choice.value.length} chars)`);
+                        validationErrors.push(`Command ${cmd.name} subcommand ${option.name} option ${subOption.name} choice ${choice.name} has value longer than 100 chars: "${choice.name}" (${choice.name.length} chars)`);
                     }
                 }
             }
@@ -231,8 +232,10 @@ function prepareCommandsForRegistration(commands) {
     }
 
     logger.warn(`Command count (${commands.length}) exceeds Discord limit (${MAX_COMMANDS}), truncating...`);
-    const truncated = commands.slice(0, MAX_COMMANDS);
-    logger.info(`Truncated to ${truncated.length} commands for registration`);
+    const priorityCommands = commands.filter((command) => command.name === 'say');
+    const otherCommands = commands.filter((command) => command.name !== 'say');
+    const truncated = [...priorityCommands, ...otherCommands].slice(0, MAX_COMMANDS);
+    logger.info(`Truncated to ${truncated.length} commands for registration; /say was prioritized`);
     return truncated;
 }
 
@@ -263,12 +266,45 @@ async function registerGlobalCommands(client, clientId, commands, totalSubcomman
     logger.info('Global commands may take up to an hour to appear in all servers on first deploy');
 }
 
+async function clearGlobalCommands(client) {
+    try {
+        await client.rest.put(`/applications/${client.user.id}/commands`, { body: [] });
+        logger.info('Successfully cleared global slash commands.');
+    } catch (error) {
+        logger.warn('Could not clear global slash commands:', error?.message || error);
+    }
+}
+
+async function registerCommandsToGuild(client, guildId, commands) {
+    if (!guildId) throw new Error('No guild ID available for immediate slash command registration');
+    validateCommands(commands);
+    const commandsToRegister = prepareCommandsForRegistration(commands);
+    logger.info(`Registering ${commandsToRegister.length} commands to target guild ${guildId}...`);
+    await client.rest.put(`/applications/${client.user.id}/guilds/${guildId}/commands`, { body: commandsToRegister });
+    logger.info(`Successfully registered ${commandsToRegister.length} guild commands in ${guildId}`);
+}
+
 export async function registerCommands(client, options = {}) {
     const { clientId = null } = options;
 
     try {
-        const { commands, totalSubcommands } = collectCommandPayloads(client);
-        await registerGlobalCommands(client, clientId, commands, totalSubcommands);
+        const { commands } = collectCommandPayloads(client);
+        if (!commands.length) {
+            throw new Error('No slash commands were loaded from src/commands');
+        }
+
+        // Guild registration is intentional here: it updates Discord immediately
+        // instead of waiting for global-command propagation. The target is the
+        // MilesAway server, avoiding the stale GUILD_ID that previously pointed
+        // at another server.
+        logger.info(`Command registration target: ${TARGET_GUILD_ID}`);
+        if (!client.guilds.cache.has(TARGET_GUILD_ID)) {
+            throw new Error(`Bot is not currently in target guild ${TARGET_GUILD_ID}`);
+        }
+
+        await registerCommandsToGuild(client, TARGET_GUILD_ID, commands);
+        await clearGlobalCommands(client);
+        logger.info(`Slash commands registered successfully in target guild ${TARGET_GUILD_ID}.`);
     } catch (error) {
         logger.error('Error registering commands:', error);
         throw error;

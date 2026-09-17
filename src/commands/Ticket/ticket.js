@@ -74,7 +74,7 @@ export default {
                 .addIntegerOption((option) =>
                     option
                         .setName("max_tickets_per_user")
-                        .setDescription("Maximum number of tickets a user can create (default: 3)")
+                        .setDescription("Maximum number of tickets a user can create (default: 10)")
                         .setMinValue(1)
                         .setMaxValue(10)
                         .setRequired(false),
@@ -133,7 +133,7 @@ const panelMessage = interaction.options.getString("panel_message") || "Click th
             const buttonLabel =
                 interaction.options.getString("button_label") ||
 "Create Ticket";
-            const maxTicketsPerUser = interaction.options.getInteger("max_tickets_per_user") || 3;
+            const maxTicketsPerUser = interaction.options.getInteger("max_tickets_per_user") || 10;
 const dmOnClose = interaction.options.getBoolean("dm_on_close") !== false;
 
             const setupEmbed = createEmbed({ 
@@ -192,11 +192,11 @@ description: panelMessage,
                 }
                 
                 if (closedCategoryChannel) {
-                    successMessage += `Closed tickets will be moved to **${closedCategoryChannel.name}**.`;
+                    successMessage += ` Closed tickets will be moved to **${closedCategoryChannel.name}**.`;
                 }
                 
                 if (staffRole) {
-                    successMessage += `**${staffRole.name}** role will have access to tickets.`;
+                    successMessage += ` **${staffRole.name}** role will have access to tickets.`;
                 }
                 
                 successMessage += `\n\n**Max Tickets Per User:** ${maxTicketsPerUser}\n**DM on Close:** ${dmOnClose ? 'Enabled' : 'Disabled'}`;

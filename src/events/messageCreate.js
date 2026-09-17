@@ -1,4 +1,4 @@
-import { Events, EmbedBuilder } from 'discord.js';
+import { Events } from 'discord.js';
 import { logger } from '../utils/logger.js';
 import { getLevelingConfig, getUserLevelData } from '../services/leveling/leveling.js';
 import { addXp } from '../services/leveling/xpSystem.js';
@@ -12,7 +12,6 @@ import { getCommandPrefix, getBotMessage, isBotOwner, isCommandCategoryEnabled, 
 import { enforceAbuseProtection, formatCooldownDuration } from '../utils/abuseProtection.js';
 import { createEmbed } from '../utils/embeds.js';
 import { isCommandEnabled } from '../services/commandAccessService.js';
-import { DnrService } from '../services/moderation/dnrService.js';
 import {
   getCountingGameConfig,
   saveCountingGameConfig,
@@ -31,9 +30,6 @@ export default {
 
       logger.debug(`Message received from ${message.author.tag}: ${message.content}`);
 
-      const dnrBlocked = await handleDnrProtection(message);
-      if (dnrBlocked) return;
-
       const countingProcessed = await handleCountingGame(message, client);
       if (countingProcessed) return;
 
@@ -44,45 +40,6 @@ export default {
     }
   }
 };
-
-async function handleDnrProtection(message) {
-  try {
-    const dnrerIds = await DnrService.getDnrerForUser(message.guild.id, message.author.id);
-    if (!dnrerIds.length) return false;
-
-    let blockedDnrerId = null;
-
-    for (const dnrerId of dnrerIds) {
-      if (message.mentions.users.has(dnrerId)) {
-        blockedDnrerId = dnrerId;
-        break;
-      }
-
-      if (message.reference?.messageId) {
-        const referenced = await message.channel.messages.fetch(message.reference.messageId).catch(() => null);
-        if (referenced?.author?.id === dnrerId) {
-          blockedDnrerId = dnrerId;
-          break;
-        }
-      }
-    }
-
-    if (!blockedDnrerId) return false;
-
-    await message.delete().catch(() => {});
-
-    const embed = new EmbedBuilder()
-      .setTitle('❗ This user DNRED you')
-      .setDescription("**You can't ping or reply to them unless they undnr you**")
-      .setColor(0x2b2d31);
-
-    await message.channel.send({ embeds: [embed] }).catch(() => {});
-    return true;
-  } catch (error) {
-    logger.error('Error handling DNR protection:', error);
-    return false;
-  }
-}
 
 async function handlePrefixCommand(message, client) {
   try {

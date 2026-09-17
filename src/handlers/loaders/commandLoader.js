@@ -9,6 +9,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const MAX_COMMANDS = 100;
 const COMMAND_COUNT_WARN_THRESHOLD = 90;
+const TARGET_GUILD_ID = '1530914065147363378';
 
 function getSubcommandInfo(commandData) {
     const subcommands = [];
@@ -86,6 +87,9 @@ function validateCommands(commands) {
 
 function prepareCommandsForRegistration(commands) {
     if (commands.length >= COMMAND_COUNT_WARN_THRESHOLD) logger.warn(`Command count (${commands.length}) is near Discord's ${MAX_COMMANDS} global command limit`);
+    if (commands.length > MAX_COMMANDS) {
+        logger.warn(`Only the first ${MAX_COMMANDS} of ${commands.length} commands can be registered because Discord's application command limit is ${MAX_COMMANDS}.`);
+    }
     return commands.slice(0, MAX_COMMANDS);
 }
 
@@ -93,47 +97,47 @@ async function registerCommandsToGuild(client, guildId, commands) {
     if (!guildId) throw new Error('No guild ID available for immediate slash command registration');
     validateCommands(commands);
     const commandsToRegister = prepareCommandsForRegistration(commands);
-    logger.info(`Registering ${commandsToRegister.length} commands to guild ${guildId}...`);
+    logger.info(`Registering ${commandsToRegister.length} commands to TARGET guild ${guildId}...`);
     await client.rest.put(`/applications/${client.user.id}/guilds/${guildId}/commands`, { body: commandsToRegister });
     logger.info(`Successfully registered ${commandsToRegister.length} guild commands in ${guildId}`);
 }
 
-async function registerGlobalCommands(client, clientId, commands) {
-    if (!clientId) throw new Error('CLIENT_ID is required for slash command registration');
-    validateCommands(commands);
-    const commandsToRegister = prepareCommandsForRegistration(commands);
-    await client.rest.put(`/applications/${clientId}/commands`, { body: commandsToRegister });
-    logger.info(`Successfully registered ${commandsToRegister.length} global commands`);
+async function clearGlobalCommands(client) {
+    try {
+        await client.rest.put(`/applications/${client.user.id}/commands`, { body: [] });
+        logger.info('Successfully cleared global slash commands so old BotGhost/global commands do not remain visible.');
+    } catch (error) {
+        logger.warn('Could not clear global slash commands:', error?.message || error);
+    }
 }
 
 export async function registerCommands(client, options = {}) {
-    const { clientId = null, guildId = null } = options;
     const { commands } = collectCommandPayloads(client);
     if (!commands.length) throw new Error('No slash commands were loaded from src/commands');
 
-    const immediateGuildId = guildId || process.env.GUILD_ID || client.guilds.cache.first()?.id;
+    // Always use the intended MilesAway server instead of a stale/wrong GUILD_ID
+    // from the hosting environment.
+    const immediateGuildId = TARGET_GUILD_ID;
+
+    logger.info(`Command registration target: ${immediateGuildId}`);
+    if (!client.guilds.cache.has(immediateGuildId)) {
+        logger.warn(`Bot is not currently cached in target guild ${immediateGuildId}. Check that this bot account is actually in that server.`);
+    }
+
     let guildRegistered = false;
-
-    if (immediateGuildId) {
-        try {
-            await registerCommandsToGuild(client, immediateGuildId, commands);
-            guildRegistered = true;
-        } catch (error) {
-            logger.error(`Guild command registration failed for ${immediateGuildId}:`, error);
-        }
-    } else {
-        logger.warn('No GUILD_ID found and the bot is not cached in a guild; skipping immediate guild registration.');
-    }
-
     try {
-        await registerGlobalCommands(client, clientId || client.user.id, commands);
+        await registerCommandsToGuild(client, immediateGuildId, commands);
+        guildRegistered = true;
     } catch (error) {
-        logger.error('Global command registration failed:', error);
-        if (!guildRegistered) throw error;
+        logger.error(`Guild command registration failed for ${immediateGuildId}:`, error);
     }
+
+    // Remove stale global/BotGhost commands. The bot's commands are intentionally
+    // registered to the target guild above for immediate availability.
+    await clearGlobalCommands(client);
 
     if (!guildRegistered) {
-        throw new Error('Commands could not be registered to a guild. Check that the bot is in the target server and has the applications.commands scope.');
+        throw new Error(`Commands could not be registered to target guild ${immediateGuildId}. Make sure the bot is in that server and was invited with the applications.commands scope.`);
     }
 }
 

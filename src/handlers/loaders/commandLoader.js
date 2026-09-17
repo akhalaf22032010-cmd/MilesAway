@@ -170,7 +170,7 @@ function validateCommands(commands) {
                 validationErrors.push(`Command ${cmd.name} option ${option.name} has name longer than 32 chars: "${option.name}" (${option.name.length} chars)`);
             }
             if (option.description && option.description.length > 110) {
-                validationErrors.push(`Command ${cmd.name} option ${option.name} has description longer than 110 chars: "${option.description}" (${option.description.length} chars)`);
+                validationErrors.push(`Command ${cmd.name} option ${option.name} has description longer than 110 chars: "${option.name}" (${option.description.length} chars)`);
             }
 
             if (option.choices) {
@@ -193,7 +193,7 @@ function validateCommands(commands) {
                     validationErrors.push(`Command ${cmd.name} subcommand ${option.name} option ${subOption.name} has name longer than 32 chars: "${subOption.name}" (${subOption.name.length} chars)`);
                 }
                 if (subOption.description && subOption.description.length > 110) {
-                    validationErrors.push(`Command ${cmd.name} subcommand ${option.name} option ${subOption.name} has description longer than 110 chars: "${subOption.description}" (${subOption.description.length} chars)`);
+                    validationErrors.push(`Command ${cmd.name} subcommand ${option.name} option ${subOption.name} has description longer than 110 chars: "${subOption.name}" (${subOption.description.length} chars)`);
                 }
 
                 if (!subOption.choices) {
@@ -229,11 +229,11 @@ function prepareCommandsForRegistration(commands) {
     }
 
     logger.warn(`Command count (${commands.length}) exceeds Discord limit (${MAX_COMMANDS}), truncating...`);
-    const priorityNames = new Set(['say', 'react', 'remind']);
+    const priorityNames = new Set(['dnr', 'say', 'react', 'remind']);
     const priorityCommands = commands.filter((command) => priorityNames.has(command.name));
     const otherCommands = commands.filter((command) => !priorityNames.has(command.name));
     const truncated = [...priorityCommands, ...otherCommands].slice(0, MAX_COMMANDS);
-    logger.info(`Truncated to ${truncated.length} commands for registration; /say, /react, and /remind were prioritized`);
+    logger.info(`Truncated to ${truncated.length} commands for registration; /dnr, /say, /react, and /remind were prioritized`);
     return truncated;
 }
 

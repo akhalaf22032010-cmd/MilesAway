@@ -231,8 +231,18 @@ function prepareCommandsForRegistration(commands) {
     }
 
     logger.warn(`Command count (${commands.length}) exceeds Discord limit (${MAX_COMMANDS}), truncating...`);
-    const truncated = commands.slice(0, MAX_COMMANDS);
+
+    // Keep /sayimage registered even when the project has more than Discord's
+    // 100-command global limit. Without this, alphabetical filesystem loading
+    // can place /sayimage outside the first 100 commands and it never appears.
+    const priorityCommands = commands.filter((command) => command.name === 'sayimage');
+    const otherCommands = commands.filter((command) => command.name !== 'sayimage');
+    const truncated = [...priorityCommands, ...otherCommands].slice(0, MAX_COMMANDS);
+
     logger.info(`Truncated to ${truncated.length} commands for registration`);
+    if (priorityCommands.length > 0) {
+        logger.info('Preserved /sayimage while truncating the command list');
+    }
     return truncated;
 }
 

@@ -9,27 +9,25 @@ function dnrEmbed(title, description) {
 export default {
   data: new SlashCommandBuilder()
     .setName('dnr')
-    .setDescription('DNR a user so they cannot ping or reply to you')
-    .addSubcommand((subcommand) =>
-      subcommand
-        .setName('user')
-        .setDescription('DNR a user')
-        .addUserOption((option) =>
-          option.setName('user').setDescription('The user to DNR').setRequired(true),
-        ),
+    .setDescription('DNR a user or view your DNR list')
+    .addStringOption((option) =>
+      option
+        .setName('action')
+        .setDescription('Use list to view your DNR list')
+        .setRequired(false)
+        .addChoices({ name: 'list', value: 'list' }),
     )
-    .addSubcommand((subcommand) =>
-      subcommand
-        .setName('list')
-        .setDescription('Show the people you DNRd'),
+    .addUserOption((option) =>
+      option.setName('user').setDescription('The user to DNR').setRequired(false),
     )
     .setDMPermission(false),
   category: 'moderation',
 
   async execute(interaction) {
-    const subcommand = interaction.options.getSubcommand();
+    const action = interaction.options.getString('action');
+    const target = interaction.options.getUser('user');
 
-    if (subcommand === 'list') {
+    if (action === 'list') {
       const ids = getDnrList(interaction.guild.id, interaction.user.id);
       if (ids.length === 0) {
         return InteractionHelper.safeReply(interaction, {
@@ -45,7 +43,13 @@ export default {
       });
     }
 
-    const target = interaction.options.getUser('user', true);
+    if (!target) {
+      return InteractionHelper.safeReply(interaction, {
+        embeds: [dnrEmbed('❌ Missing user', 'Use `/dnr @user` to DNR someone, or `/dnr list` to view your list.')],
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+
     if (target.id === interaction.user.id) {
       return InteractionHelper.safeReply(interaction, {
         embeds: [dnrEmbed('❌ You cannot DNR yourself', 'Choose another user.')],

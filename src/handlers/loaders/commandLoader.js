@@ -158,7 +158,7 @@ function validateCommands(commands) {
             validationErrors.push(`Command ${cmd.name} has name longer than 32 chars: "${cmd.name}" (${cmd.name.length} chars)`);
         }
         if (cmd.description && cmd.description.length > 110) {
-            validationErrors.push(`Command ${cmd.name} has description longer than 110 chars: "${cmd.description}" (${cmd.description.length} chars)`);
+            validationErrors.push(`Command ${cmd.name} has description longer than 110 chars: "${cmd.name}" (${cmd.description.length} chars)`);
         }
 
         if (!cmd.options) {
@@ -229,11 +229,11 @@ function prepareCommandsForRegistration(commands) {
     }
 
     logger.warn(`Command count (${commands.length}) exceeds Discord limit (${MAX_COMMANDS}), truncating...`);
-    const priorityNames = new Set(['dnr', 'say', 'react', 'remind']);
+    const priorityNames = new Set(['say', 'react', 'remind']);
     const priorityCommands = commands.filter((command) => priorityNames.has(command.name));
     const otherCommands = commands.filter((command) => !priorityNames.has(command.name));
     const truncated = [...priorityCommands, ...otherCommands].slice(0, MAX_COMMANDS);
-    logger.info(`Truncated to ${truncated.length} commands for registration; /dnr, /say, /react, and /remind were prioritized`);
+    logger.info(`Truncated to ${truncated.length} commands for registration; /say, /react, and /remind were prioritized`);
     return truncated;
 }
 

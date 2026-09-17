@@ -41,8 +41,6 @@ async function groupTicketCommands(client) {
     const ticket = client.commands.get('ticket');
     if (!ticket) return;
 
-    // Ticket action handlers live in modules/ so they do not consume
-    // top-level Discord command slots. Load them directly for execution.
     const claim = (await import('../../commands/Ticket/modules/ticket_claim.js')).default;
     const close = (await import('../../commands/Ticket/modules/ticket_close.js')).default;
     const priority = (await import('../../commands/Ticket/modules/ticket_priority.js')).default;
@@ -199,11 +197,15 @@ function prepareCommandsForRegistration(commands) {
     if (commands.length >= COMMAND_COUNT_WARN_THRESHOLD) logger.warn(`Command count (${commands.length}) is near Discord's ${MAX_COMMANDS} global command limit`);
     if (commands.length <= MAX_COMMANDS) return commands;
     logger.warn(`Command count (${commands.length}) exceeds Discord limit (${MAX_COMMANDS}), truncating...`);
-    const priorityNames = new Set(['say', 'react', 'remind']);
+
+    // These commands must always survive the 100-command limit.
+    // /ticket is explicitly included because its functionality is grouped
+    // into subcommands and should never disappear from registration.
+    const priorityNames = new Set(['ticket', 'say', 'react', 'remind']);
     const priorityCommands = commands.filter(command => priorityNames.has(command.name));
     const otherCommands = commands.filter(command => !priorityNames.has(command.name));
     const truncated = [...priorityCommands, ...otherCommands].slice(0, MAX_COMMANDS);
-    logger.info(`Truncated to ${truncated.length} commands for registration; /say, /react, and /remind were prioritized`);
+    logger.info(`Truncated to ${truncated.length} commands for registration; /ticket, /say, /react, and /remind were prioritized`);
     return truncated;
 }
 

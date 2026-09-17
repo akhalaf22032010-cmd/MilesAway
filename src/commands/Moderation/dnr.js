@@ -6,6 +6,7 @@ export default {
   data: new SlashCommandBuilder()
     .setName('dnr')
     .setDescription('Tell a user not to ping or reply to you')
+    .setDefaultMemberPermissions(null)
     .addUserOption(option =>
       option
         .setName('user')

@@ -20,36 +20,22 @@ export default {
     const protectedUser = interaction.user;
 
     if (target.id === protectedUser.id) {
-      await interaction.reply({
-        content: '❌ You cannot DNR yourself.',
-        ephemeral: true,
-      });
+      await interaction.reply({ content: '❌ You cannot DNR yourself.', ephemeral: true });
       return;
     }
 
     if (target.bot) {
-      await interaction.reply({
-        content: '❌ You cannot DNR a bot.',
-        ephemeral: true,
-      });
+      await interaction.reply({ content: '❌ You cannot DNR a bot.', ephemeral: true });
       return;
     }
 
-    const protectedUsers = await DnrService.addDnr(
-      interaction.guildId,
-      target.id,
-      protectedUser.id,
-    );
+    await DnrService.addDnr(interaction.guildId, target.id, protectedUser.id);
 
     await interaction.reply({
-      content: `🚫 <@${target.id}> — do not ping or reply to <@${protectedUser.id}>.\nIf you do, you will receive a DNR warning. **3 warnings = 5 minute timeout.**`,
-      allowedMentions: {
-        users: [target.id, protectedUser.id],
-      },
+      content: `# ${target.username.toUpperCase()} DNRED\n\n**${target.username} has been Dnred by ${protectedUser.username}**`,
+      allowedMentions: { users: [target.id] },
     });
 
-    logger.info(
-      `DNR created in ${interaction.guildId}: ${target.id} must not ping/reply to ${protectedUser.id} (${protectedUsers.length} protected users for target)`,
-    );
+    logger.info(`DNR created in ${interaction.guildId}: ${target.id} must not ping/reply to ${protectedUser.id}`);
   },
 };

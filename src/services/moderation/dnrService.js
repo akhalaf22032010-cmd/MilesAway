@@ -23,6 +23,21 @@ class DnrService {
     return current;
   }
 
+  static async removeDnr(guildId, targetUserId, protectedUserId) {
+    const data = await getGuildData(guildId);
+    const current = Array.isArray(data[targetUserId]) ? data[targetUserId] : [];
+    const updated = current.filter(userId => userId !== protectedUserId);
+
+    if (updated.length > 0) {
+      data[targetUserId] = updated;
+    } else {
+      delete data[targetUserId];
+    }
+
+    await setInDb(getDnrKey(guildId), data);
+    return current.length !== updated.length;
+  }
+
   static async getProtectedUsers(guildId, targetUserId) {
     const data = await getGuildData(guildId);
     return Array.isArray(data[targetUserId]) ? data[targetUserId] : [];

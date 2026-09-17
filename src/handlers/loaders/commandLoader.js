@@ -158,7 +158,7 @@ function validateCommands(commands) {
             validationErrors.push(`Command ${cmd.name} has name longer than 32 chars: "${cmd.name}" (${cmd.name.length} chars)`);
         }
         if (cmd.description && cmd.description.length > 110) {
-            validationErrors.push(`Command ${cmd.name} has description longer than 110 chars: "${cmd.name}" (${cmd.description.length} chars)`);
+            validationErrors.push(`Command ${cmd.name} has description longer than 110 chars: "${cmd.name}" (${cmd.name.length} chars)`);
         }
 
         if (!cmd.options) {
@@ -179,7 +179,7 @@ function validateCommands(commands) {
                         validationErrors.push(`Command ${cmd.name} option ${option.name} choice ${choice.name} has name longer than 110 chars: "${choice.name}" (${choice.name.length} chars)`);
                     }
                     if (choice.value && choice.value.length > 100) {
-                        validationErrors.push(`Command ${cmd.name} option ${option.name} choice ${choice.name} has value longer than 100 chars: "${choice.name}" (${choice.name.length} chars)`);
+                        validationErrors.push(`Command ${cmd.name} option ${option.name} choice ${choice.name} has value longer than 100 chars: "${choice.name}" (${choice.value.length} chars)`);
                     }
                 }
             }
@@ -193,7 +193,7 @@ function validateCommands(commands) {
                     validationErrors.push(`Command ${cmd.name} subcommand ${option.name} option ${subOption.name} has name longer than 32 chars: "${subOption.name}" (${subOption.name.length} chars)`);
                 }
                 if (subOption.description && subOption.description.length > 110) {
-                    validationErrors.push(`Command ${cmd.name} subcommand ${option.name} option ${subOption.name} has description longer than 110 chars: "${subOption.name}" (${subOption.description.length} chars)`);
+                    validationErrors.push(`Command ${cmd.name} subcommand ${option.name} option ${subOption.name} has description longer than 110 chars: "${subOption.name}" (${subOption.name.length} chars)`);
                 }
 
                 if (!subOption.choices) {
@@ -202,10 +202,10 @@ function validateCommands(commands) {
 
                 for (const choice of subOption.choices) {
                     if (choice.name && choice.name.length > 110) {
-                        validationErrors.push(`Command ${cmd.name} subcommand ${option.name} subcommand ${subOption.name} choice ${choice.name} has name longer than 110 chars: "${choice.name}" (${choice.name.length} chars)`);
+                        validationErrors.push(`Command ${cmd.name} subcommand ${option.name} subcommand ${subOption.name} choice ${choice.name} has name longer than 110 chars: "${subOption.name}" (${choice.name.length} chars)`);
                     }
                     if (choice.value && choice.value.length > 100) {
-                        validationErrors.push(`Command ${cmd.name} subcommand ${option.name} subcommand ${subOption.name} choice ${choice.name} has value longer than 100 chars: "${choice.name}" (${choice.name.length} chars)`);
+                        validationErrors.push(`Command ${cmd.name} subcommand ${option.name} subcommand ${subOption.name} choice ${choice.name} has value longer than 100 chars: "${subOption.name}" (${choice.name.length} chars)`);
                     }
                 }
             }
@@ -229,11 +229,11 @@ function prepareCommandsForRegistration(commands) {
     }
 
     logger.warn(`Command count (${commands.length}) exceeds Discord limit (${MAX_COMMANDS}), truncating...`);
-    const priorityNames = new Set(['say', 'react', 'remind']);
+    const priorityNames = new Set(['say', 'react', 'remind', 'dnr', 'undnr']);
     const priorityCommands = commands.filter((command) => priorityNames.has(command.name));
     const otherCommands = commands.filter((command) => !priorityNames.has(command.name));
     const truncated = [...priorityCommands, ...otherCommands].slice(0, MAX_COMMANDS);
-    logger.info(`Truncated to ${truncated.length} commands for registration; /say, /react, and /remind were prioritized`);
+    logger.info(`Truncated to ${truncated.length} commands for registration; /say, /react, /remind, /dnr, and /undnr were prioritized`);
     return truncated;
 }
 

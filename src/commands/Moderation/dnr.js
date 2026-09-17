@@ -5,7 +5,7 @@ export default {
   data: new SlashCommandBuilder()
     .setName('dnr')
     .setDescription('DNR a user or view your DNR list')
-    .setDefaultMemberPermissions(null)
+    .setDefaultMemberPermissions('0')
     .addSubcommand(subcommand =>
       subcommand
         .setName('user')
@@ -43,18 +43,12 @@ export default {
     const target = interaction.options.getUser('user', true);
 
     if (target.id === interaction.user.id) {
-      await interaction.reply({
-        content: '❌ You cannot DNR yourself.',
-        ephemeral: true,
-      });
+      await interaction.reply({ content: '❌ You cannot DNR yourself.', ephemeral: true });
       return;
     }
 
     if (target.bot) {
-      await interaction.reply({
-        content: '❌ You cannot DNR a bot.',
-        ephemeral: true,
-      });
+      await interaction.reply({ content: '❌ You cannot DNR a bot.', ephemeral: true });
       return;
     }
 
@@ -71,12 +65,9 @@ export default {
 
     const embed = new EmbedBuilder()
       .setTitle(`YOU DNRED ${target.username.toUpperCase()}`)
-      .setDescription(`**Undnr them for them to ping/reply to you**`)
+      .setDescription('**Undnr them for them to ping/reply to you**')
       .setColor(0x2b2d31);
 
-    await interaction.reply({
-      embeds: [embed],
-      allowedMentions: { parse: [] },
-    });
+    await interaction.reply({ embeds: [embed], allowedMentions: { parse: [] } });
   },
 };

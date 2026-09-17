@@ -1,4 +1,4 @@
-import { Events } from 'discord.js';
+import { Events, EmbedBuilder } from 'discord.js';
 import { logger } from '../utils/logger.js';
 import { getLevelingConfig, getUserLevelData } from '../services/leveling/leveling.js';
 import { addXp } from '../services/leveling/xpSystem.js';
@@ -12,6 +12,7 @@ import { getCommandPrefix, getBotMessage, isBotOwner, isCommandCategoryEnabled, 
 import { enforceAbuseProtection, formatCooldownDuration } from '../utils/abuseProtection.js';
 import { createEmbed } from '../utils/embeds.js';
 import { isCommandEnabled } from '../services/commandAccessService.js';
+import { getDnrerIdsForTarget } from '../services/moderation/dnrService.js';
 import {
   getCountingGameConfig,
   saveCountingGameConfig,
@@ -30,6 +31,9 @@ export default {
 
       logger.debug(`Message received from ${message.author.tag}: ${message.content}`);
 
+      const dnrProcessed = await handleDnrProtection(message);
+      if (dnrProcessed) return;
+
       const countingProcessed = await handleCountingGame(message, client);
       if (countingProcessed) return;
 
@@ -40,6 +44,34 @@ export default {
     }
   }
 };
+
+async function handleDnrProtection(message) {
+  try {
+    const dnrerIds = getDnrerIdsForTarget(message.guild.id, message.author.id);
+    if (dnrerIds.length === 0) return false;
+
+    const mentionedDnrer = message.mentions.users.some((user) => dnrerIds.includes(user.id));
+    const repliedToDnrer = message.reference?.messageId
+      ? await message.channel.messages.fetch(message.reference.messageId).then((referencedMessage) =>
+          dnrerIds.includes(referencedMessage.author.id)
+        ).catch(() => false)
+      : false;
+
+    if (!mentionedDnrer && !repliedToDnrer) return false;
+
+    await message.delete().catch(() => {});
+
+    const embed = new EmbedBuilder()
+      .setTitle('❗ This user DNRED you.')
+      .setDescription('**You can\'t ping or reply to them unless they undnr you**');
+
+    await message.channel.send({ embeds: [embed] }).catch(() => {});
+    return true;
+  } catch (error) {
+    logger.error('Error handling DNR protection:', error);
+    return false;
+  }
+}
 
 async function handlePrefixCommand(message, client) {
   try {

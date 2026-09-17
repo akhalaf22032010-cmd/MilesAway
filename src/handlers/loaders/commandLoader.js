@@ -16,12 +16,12 @@ function getSubcommandInfo(commandData) {
     
     if (commandData.options) {
         for (const option of commandData.options) {
-if (option.type === 1) {
+            if (option.type === 1) {
                 subcommands.push(option.name);
-} else if (option.type === 2) {
+            } else if (option.type === 2) {
                 if (option.options) {
                     for (const subOption of option.options) {
-if (subOption.type === 1) {
+                        if (subOption.type === 1) {
                             subcommands.push(`${option.name}/${subOption.name}`);
                         }
                     }
@@ -64,7 +64,6 @@ export async function loadCommands(client) {
     for (const filePath of commandFiles) {
         try {
             const normalizedPath = filePath.replace(/\\/g, '/');
-            
             const commandName = path.basename(filePath, '.js');
             const commandDir = path.dirname(filePath);
             const category = path.basename(commandDir);
@@ -84,7 +83,6 @@ export async function loadCommands(client) {
             
             if (!uniqueCommandNames.has(primaryCommandName)) {
                 uniqueCommandNames.add(primaryCommandName);
-                
                 client.commands.set(primaryCommandName, command);
             }
             
@@ -182,7 +180,7 @@ function validateCommands(commands) {
                         validationErrors.push(`Command ${cmd.name} option ${option.name} choice ${choice.name} has name longer than 110 chars: "${choice.name}" (${choice.name.length} chars)`);
                     }
                     if (choice.value && choice.value.length > 100) {
-                        validationErrors.push(`Command ${cmd.name} option ${option.name} choice ${choice.name} has value longer than 100 chars: "${choice.value}" (${choice.value.length} chars)`);
+                        validationErrors.push(`Command ${cmd.name} option ${option.name} choice ${choice.name} has value longer than 100 chars: "${choice.name}" (${choice.name.length} chars)`);
                     }
                 }
             }
@@ -208,7 +206,7 @@ function validateCommands(commands) {
                         validationErrors.push(`Command ${cmd.name} subcommand ${option.name} option ${subOption.name} choice ${choice.name} has name longer than 110 chars: "${choice.name}" (${choice.name.length} chars)`);
                     }
                     if (choice.value && choice.value.length > 100) {
-                        validationErrors.push(`Command ${cmd.name} subcommand ${option.name} option ${subOption.name} choice ${choice.name} has value longer than 100 chars: "${choice.name}" (${choice.name.length} chars)`);
+                        validationErrors.push(`Command ${cmd.name} subcommand ${option.name} subcommand ${subOption.name} choice ${choice.name} has value longer than 100 chars: "${choice.name}" (${choice.value.length} chars)`);
                     }
                 }
             }
@@ -232,10 +230,14 @@ function prepareCommandsForRegistration(commands) {
     }
 
     logger.warn(`Command count (${commands.length}) exceeds Discord limit (${MAX_COMMANDS}), truncating...`);
-    const priorityCommands = commands.filter((command) => command.name === 'say');
-    const otherCommands = commands.filter((command) => command.name !== 'say');
+    const priorityCommands = commands.filter((command) =>
+        command.name === 'say' || command.name === 'react'
+    );
+    const otherCommands = commands.filter((command) =>
+        command.name !== 'say' && command.name !== 'react'
+    );
     const truncated = [...priorityCommands, ...otherCommands].slice(0, MAX_COMMANDS);
-    logger.info(`Truncated to ${truncated.length} commands for registration; /say was prioritized`);
+    logger.info(`Truncated to ${truncated.length} commands for registration; /say and /react were prioritized`);
     return truncated;
 }
 
@@ -293,10 +295,6 @@ export async function registerCommands(client, options = {}) {
             throw new Error('No slash commands were loaded from src/commands');
         }
 
-        // Guild registration is intentional here: it updates Discord immediately
-        // instead of waiting for global-command propagation. The target is the
-        // MilesAway server, avoiding the stale GUILD_ID that previously pointed
-        // at another server.
         logger.info(`Command registration target: ${TARGET_GUILD_ID}`);
         if (!client.guilds.cache.has(TARGET_GUILD_ID)) {
             throw new Error(`Bot is not currently in target guild ${TARGET_GUILD_ID}`);

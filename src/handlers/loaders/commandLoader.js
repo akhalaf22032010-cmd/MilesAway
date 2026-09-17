@@ -202,7 +202,7 @@ function validateCommands(commands) {
 
                 for (const choice of subOption.choices) {
                     if (choice.name && choice.name.length > 110) {
-                        validationErrors.push(`Command ${cmd.name} subcommand ${option.name} option ${subOption.name} choice ${choice.name} has name longer than 110 chars: "${choice.name}" (${choice.name.length} chars)`);
+                        validationErrors.push(`Command ${cmd.name} subcommand ${option.name} subcommand ${subOption.name} choice ${choice.name} has name longer than 110 chars: "${choice.name}" (${choice.name.length} chars)`);
                     }
                     if (choice.value && choice.value.length > 100) {
                         validationErrors.push(`Command ${cmd.name} subcommand ${option.name} subcommand ${subOption.name} choice ${choice.name} has value longer than 100 chars: "${choice.name}" (${choice.name.length} chars)`);
@@ -229,14 +229,11 @@ function prepareCommandsForRegistration(commands) {
     }
 
     logger.warn(`Command count (${commands.length}) exceeds Discord limit (${MAX_COMMANDS}), truncating...`);
-    const priorityCommands = commands.filter((command) =>
-        command.name === 'say' || command.name === 'react'
-    );
-    const otherCommands = commands.filter((command) =>
-        command.name !== 'say' && command.name !== 'react'
-    );
+    const priorityNames = new Set(['say', 'react', 'remind']);
+    const priorityCommands = commands.filter((command) => priorityNames.has(command.name));
+    const otherCommands = commands.filter((command) => !priorityNames.has(command.name));
     const truncated = [...priorityCommands, ...otherCommands].slice(0, MAX_COMMANDS);
-    logger.info(`Truncated to ${truncated.length} commands for registration; /say and /react were prioritized`);
+    logger.info(`Truncated to ${truncated.length} commands for registration; /say, /react, and /remind were prioritized`);
     return truncated;
 }
 

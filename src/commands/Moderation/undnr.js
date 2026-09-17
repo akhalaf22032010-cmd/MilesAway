@@ -5,7 +5,7 @@ export default {
   data: new SlashCommandBuilder()
     .setName('undnr')
     .setDescription('Remove your DNR from a user')
-    .setDefaultMemberPermissions(null)
+    .setDefaultMemberPermissions('0')
     .addUserOption(option =>
       option.setName('user').setDescription('User to UNDNR').setRequired(true)
     ),
@@ -28,9 +28,6 @@ export default {
       .setDescription('**They can now ping/reply to you**')
       .setColor(0x2b2d31);
 
-    await interaction.reply({
-      embeds: [embed],
-      allowedMentions: { parse: [] },
-    });
+    await interaction.reply({ embeds: [embed], allowedMentions: { parse: [] } });
   },
 };

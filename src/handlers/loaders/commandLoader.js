@@ -54,6 +54,9 @@ export async function loadCommands(client) {
     for (const filePath of commandFiles) {
         try {
             const normalizedPath = filePath.replace(/\\/g, '/');
+            const commandName = path.basename(filePath, '.js');
+            const commandDir = path.dirname(filePath);
+            const category = path.basename(commandDir);
             const commandModule = await import(`file://${filePath}`);
             const command = commandModule.default || commandModule;
 
@@ -62,7 +65,7 @@ export async function loadCommands(client) {
                 continue;
             }
 
-            command.category = path.basename(path.dirname(filePath));
+            command.category = category;
             command.filePath = normalizedPath;
             const primaryCommandName = command.data.name;
 
@@ -72,7 +75,7 @@ export async function loadCommands(client) {
             }
 
             const subcommands = getSubcommandInfo(command.data.toJSON());
-            logger.info(`Loaded command: ${primaryCommandName} from ${normalizedPath} (category: ${command.category})`);
+            logger.info(`Loaded command: ${primaryCommandName} from ${normalizedPath} (category: ${category})`);
             if (subcommands.length > 0) {
                 logger.info(`  - Subcommands: ${subcommands.join(', ')}`);
             }
@@ -89,7 +92,11 @@ export async function loadCommands(client) {
         return total + getSubcommandInfo(cmd.data.toJSON()).length;
     }, 0);
 
-    logger.info(`Loaded ${uniqueCommandNames.size} commands`);
+    const uniqueCommands = new Set();
+    for (const [name, command] of client.commands.entries()) {
+        if (command.data && command.data.name) uniqueCommands.add(command.data.name);
+    }
+    logger.info(`Loaded ${uniqueCommands.size} commands`);
     return client.commands;
 }
 
@@ -105,12 +112,20 @@ function collectCommandPayloads(client) {
         }
 
         const commandName = command.data.name;
-        if (registeredNames.has(commandName)) continue;
+        logger.debug(`Processing command for registration: ${commandName}`);
+        if (registeredNames.has(commandName)) {
+            logger.debug(`Skipping duplicate command: ${commandName}`);
+            continue;
+        }
 
         registeredNames.add(commandName);
         const commandJson = command.data.toJSON();
         commands.push(commandJson);
         totalSubcommands += getSubcommandInfo(commandJson).length;
+
+        if (process.env.NODE_ENV !== 'production') {
+            logger.debug(`Registering command: ${commandName}`);
+        }
     }
     return { commands, totalSubcommands };
 }
@@ -178,43 +193,31 @@ function prepareCommandsForRegistration(commands) {
     }
     if (commands.length <= MAX_COMMANDS) return commands;
     logger.warn(`Command count (${commands.length}) exceeds Discord limit (${MAX_COMMANDS}), truncating...`);
-    return commands.slice(0, MAX_COMMANDS);
+    const truncated = commands.slice(0, MAX_COMMANDS);
+    logger.info(`Truncated to ${truncated.length} commands for registration`);
+    return truncated;
 }
 
 async function registerGlobalCommands(client, clientId, commands, totalSubcommands) {
     if (!clientId) throw new Error('CLIENT_ID is required for slash command registration');
     if (!client.rest) throw new Error('Discord REST client is not available for slash command registration');
 
-    logger.info(`Preparing to register ${totalSubcommands + commands.length} commands`);
+    logger.info(`Preparing to register ${totalSubcommands + commands.length} commands globally`);
+    logger.info('Validating commands before registration...');
     validateCommands(commands);
     logger.info('Command validation passed');
 
     const commandsToRegister = prepareCommandsForRegistration(commands);
 
-    // Replace the global command set so old BotGhost/old-build commands are removed.
-    logger.info('Clearing existing global commands...');
+    // Always replace the complete global command set with the GitHub command set.
+    // This removes stale commands previously registered by BotGhost or older builds.
+    logger.info('Clearing existing global commands before GitHub command registration...');
     await client.rest.put(`/applications/${clientId}/commands`, { body: [] });
+
+    logger.info(`Registering ${commandsToRegister.length} global commands...`);
     await client.rest.put(`/applications/${clientId}/commands`, { body: commandsToRegister });
     logger.info(`Successfully registered ${commandsToRegister.length} global commands`);
-
-    // Also register directly to every server the bot is currently in.
-    // Guild commands appear immediately instead of waiting for global propagation.
-    const guilds = client.guilds?.cache;
-    if (guilds?.size) {
-        logger.info(`Registering commands directly to ${guilds.size} guild(s) for immediate availability...`);
-        for (const [guildId, guild] of guilds) {
-            try {
-                await client.rest.put(`/applications/${clientId}/guilds/${guildId}/commands`, {
-                    body: commandsToRegister
-                });
-                logger.info(`Successfully registered ${commandsToRegister.length} commands in guild: ${guild.name} (${guildId})`);
-            } catch (error) {
-                logger.error(`Failed to register commands in guild ${guild.name} (${guildId}):`, error);
-            }
-        }
-    } else {
-        logger.warn('No cached guilds found; global commands were still registered.');
-    }
+    logger.info('Global commands may take up to an hour to appear in all servers on first deploy');
 }
 
 export async function registerCommands(client, options = {}) {

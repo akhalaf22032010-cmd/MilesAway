@@ -15,9 +15,7 @@ function getSubcommandInfo(commandData) {
     if (commandData.options) {
         for (const option of commandData.options) {
             if (option.type === 1) subcommands.push(option.name);
-            else if (option.type === 2 && option.options) {
-                for (const subOption of option.options) if (subOption.type === 1) subcommands.push(`${option.name}/${subOption.name}`);
-            }
+            else if (option.type === 2 && option.options) for (const subOption of option.options) if (subOption.type === 1) subcommands.push(`${option.name}/${subOption.name}`);
         }
     }
     return subcommands;
@@ -97,14 +95,13 @@ async function registerCommandsToGuild(client, guildId, commands) {
     const commandsToRegister = prepareCommandsForRegistration(commands);
     logger.info(`Registering ${commandsToRegister.length} commands to guild ${guildId}...`);
     await client.rest.put(`/applications/${client.user.id}/guilds/${guildId}/commands`, { body: commandsToRegister });
-    logger.info(`Successfully registered ${commandsToRegister.length} guild commands`);
+    logger.info(`Successfully registered ${commandsToRegister.length} guild commands in ${guildId}`);
 }
 
 async function registerGlobalCommands(client, clientId, commands) {
     if (!clientId) throw new Error('CLIENT_ID is required for slash command registration');
     validateCommands(commands);
     const commandsToRegister = prepareCommandsForRegistration(commands);
-    await client.rest.put(`/applications/${clientId}/commands`, { body: [] });
     await client.rest.put(`/applications/${clientId}/commands`, { body: commandsToRegister });
     logger.info(`Successfully registered ${commandsToRegister.length} global commands`);
 }
@@ -112,9 +109,32 @@ async function registerGlobalCommands(client, clientId, commands) {
 export async function registerCommands(client, options = {}) {
     const { clientId = null, guildId = null } = options;
     const { commands } = collectCommandPayloads(client);
+    if (!commands.length) throw new Error('No slash commands were loaded from src/commands');
+
     const immediateGuildId = guildId || process.env.GUILD_ID || client.guilds.cache.first()?.id;
-    if (immediateGuildId) await registerCommandsToGuild(client, immediateGuildId, commands);
-    else await registerGlobalCommands(client, clientId, commands);
+    let guildRegistered = false;
+
+    if (immediateGuildId) {
+        try {
+            await registerCommandsToGuild(client, immediateGuildId, commands);
+            guildRegistered = true;
+        } catch (error) {
+            logger.error(`Guild command registration failed for ${immediateGuildId}:`, error);
+        }
+    } else {
+        logger.warn('No GUILD_ID found and the bot is not cached in a guild; skipping immediate guild registration.');
+    }
+
+    try {
+        await registerGlobalCommands(client, clientId || client.user.id, commands);
+    } catch (error) {
+        logger.error('Global command registration failed:', error);
+        if (!guildRegistered) throw error;
+    }
+
+    if (!guildRegistered) {
+        throw new Error('Commands could not be registered to a guild. Check that the bot is in the target server and has the applications.commands scope.');
+    }
 }
 
 export async function reloadCommand(client, commandName) {

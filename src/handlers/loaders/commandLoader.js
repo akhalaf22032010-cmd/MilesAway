@@ -16,9 +16,7 @@ function getSubcommandInfo(commandData) {
         for (const option of commandData.options) {
             if (option.type === 1) subcommands.push(option.name);
             else if (option.type === 2 && option.options) {
-                for (const subOption of option.options) {
-                    if (subOption.type === 1) subcommands.push(`${option.name}/${subOption.name}`);
-                }
+                for (const subOption of option.options) if (subOption.type === 1) subcommands.push(`${option.name}/${subOption.name}`);
             }
         }
     }
@@ -43,16 +41,12 @@ export async function loadCommands(client) {
     const commandFiles = await getAllFiles(commandsPath);
     logger.info(`Found ${commandFiles.length} command files to load`);
     const uniqueCommandNames = new Set();
-
     for (const filePath of commandFiles) {
         try {
             const normalizedPath = filePath.replace(/\\/g, '/');
             const commandModule = await import(`file://${filePath}`);
             const command = commandModule.default || commandModule;
-            if (!command.data || !command.execute) {
-                logger.warn(`Command at ${filePath} is missing required "data" or "execute" property.`);
-                continue;
-            }
+            if (!command.data || !command.execute) continue;
             command.category = path.basename(path.dirname(filePath));
             command.filePath = normalizedPath;
             const primaryCommandName = command.data.name;
@@ -60,12 +54,8 @@ export async function loadCommands(client) {
                 uniqueCommandNames.add(primaryCommandName);
                 client.commands.set(primaryCommandName, command);
             }
-            const subcommands = getSubcommandInfo(command.data.toJSON());
             logger.info(`Loaded command: ${primaryCommandName} from ${normalizedPath} (category: ${command.category})`);
-            if (subcommands.length > 0) logger.info(`  - Subcommands: ${subcommands.join(', ')}`);
-        } catch (error) {
-            logger.error(`Error loading command from ${filePath}:`, error);
-        }
+        } catch (error) { logger.error(`Error loading command from ${filePath}:`, error); }
     }
     logger.info(`Loaded ${client.commands.size} commands`);
     return client.commands;
@@ -88,12 +78,12 @@ function collectCommandPayloads(client) {
 }
 
 function validateCommands(commands) {
-    const validationErrors = [];
+    const errors = [];
     for (const cmd of commands) {
-        if (cmd.name && cmd.name.length > 32) validationErrors.push(`Command ${cmd.name} has name longer than 32 chars`);
-        if (cmd.description && cmd.description.length > 110) validationErrors.push(`Command ${cmd.name} has description longer than 110 chars`);
+        if (cmd.name?.length > 32) errors.push(`Command ${cmd.name} has name longer than 32 chars`);
+        if (cmd.description?.length > 110) errors.push(`Command ${cmd.name} has description longer than 110 chars`);
     }
-    if (validationErrors.length) throw new Error(`Command validation failed with ${validationErrors.length} errors: ${validationErrors.join('; ')}`);
+    if (errors.length) throw new Error(`Command validation failed: ${errors.join('; ')}`);
 }
 
 function prepareCommandsForRegistration(commands) {
@@ -101,8 +91,8 @@ function prepareCommandsForRegistration(commands) {
     return commands.slice(0, MAX_COMMANDS);
 }
 
-async function registerCommandsToGuild(client, guildId, commands, totalSubcommands) {
-    if (!guildId) throw new Error('GUILD_ID is required for immediate slash command registration');
+async function registerCommandsToGuild(client, guildId, commands) {
+    if (!guildId) throw new Error('No guild ID available for immediate slash command registration');
     validateCommands(commands);
     const commandsToRegister = prepareCommandsForRegistration(commands);
     logger.info(`Registering ${commandsToRegister.length} commands to guild ${guildId}...`);
@@ -110,11 +100,10 @@ async function registerCommandsToGuild(client, guildId, commands, totalSubcomman
     logger.info(`Successfully registered ${commandsToRegister.length} guild commands`);
 }
 
-async function registerGlobalCommands(client, clientId, commands, totalSubcommands) {
+async function registerGlobalCommands(client, clientId, commands) {
     if (!clientId) throw new Error('CLIENT_ID is required for slash command registration');
     validateCommands(commands);
     const commandsToRegister = prepareCommandsForRegistration(commands);
-    logger.info('Clearing existing global commands before GitHub command registration...');
     await client.rest.put(`/applications/${clientId}/commands`, { body: [] });
     await client.rest.put(`/applications/${clientId}/commands`, { body: commandsToRegister });
     logger.info(`Successfully registered ${commandsToRegister.length} global commands`);
@@ -122,12 +111,10 @@ async function registerGlobalCommands(client, clientId, commands, totalSubcomman
 
 export async function registerCommands(client, options = {}) {
     const { clientId = null, guildId = null } = options;
-    const { commands, totalSubcommands } = collectCommandPayloads(client);
-    if (guildId) {
-        await registerCommandsToGuild(client, guildId, commands, totalSubcommands);
-    } else {
-        await registerGlobalCommands(client, clientId, commands, totalSubcommands);
-    }
+    const { commands } = collectCommandPayloads(client);
+    const immediateGuildId = guildId || process.env.GUILD_ID || client.guilds.cache.first()?.id;
+    if (immediateGuildId) await registerCommandsToGuild(client, immediateGuildId, commands);
+    else await registerGlobalCommands(client, clientId, commands);
 }
 
 export async function reloadCommand(client, commandName) {

@@ -16,6 +16,19 @@ const TEXT_CHANNEL_TYPES = [
     ChannelType.GuildAnnouncement,
 ];
 
+const IMAGE_OPTION_NAMES = [
+    'image',
+    'image2',
+    'image3',
+    'image4',
+    'image5',
+    'image6',
+    'image7',
+    'image8',
+    'image9',
+    'image10',
+];
+
 function resolveTargetChannel(interaction) {
     const selected = interaction.options.getChannel('channel');
     if (selected) {
@@ -43,7 +56,61 @@ export default {
         .addAttachmentOption((option) =>
             option
                 .setName('image')
-                .setDescription('Optional image to send with the message')
+                .setDescription('Optional first image to send')
+                .setRequired(false),
+        )
+        .addAttachmentOption((option) =>
+            option
+                .setName('image2')
+                .setDescription('Optional second image to send')
+                .setRequired(false),
+        )
+        .addAttachmentOption((option) =>
+            option
+                .setName('image3')
+                .setDescription('Optional third image to send')
+                .setRequired(false),
+        )
+        .addAttachmentOption((option) =>
+            option
+                .setName('image4')
+                .setDescription('Optional fourth image to send')
+                .setRequired(false),
+        )
+        .addAttachmentOption((option) =>
+            option
+                .setName('image5')
+                .setDescription('Optional fifth image to send')
+                .setRequired(false),
+        )
+        .addAttachmentOption((option) =>
+            option
+                .setName('image6')
+                .setDescription('Optional sixth image to send')
+                .setRequired(false),
+        )
+        .addAttachmentOption((option) =>
+            option
+                .setName('image7')
+                .setDescription('Optional seventh image to send')
+                .setRequired(false),
+        )
+        .addAttachmentOption((option) =>
+            option
+                .setName('image8')
+                .setDescription('Optional eighth image to send')
+                .setRequired(false),
+        )
+        .addAttachmentOption((option) =>
+            option
+                .setName('image9')
+                .setDescription('Optional ninth image to send')
+                .setRequired(false),
+        )
+        .addAttachmentOption((option) =>
+            option
+                .setName('image10')
+                .setDescription('Optional tenth image to send')
                 .setRequired(false),
         )
         .addChannelOption((option) =>
@@ -73,7 +140,9 @@ export default {
 
         const rawMessage = interaction.options.getString('message');
         const message = sanitizeInput(rawMessage, 2000);
-        const image = interaction.options.getAttachment('image');
+        const images = IMAGE_OPTION_NAMES
+            .map((name) => interaction.options.getAttachment(name))
+            .filter(Boolean);
 
         if (!message) {
             return replyUserError(interaction, {
@@ -82,10 +151,11 @@ export default {
             });
         }
 
-        if (image && !image.contentType?.startsWith('image/')) {
+        const invalidImage = images.find((image) => !image.contentType?.startsWith('image/'));
+        if (invalidImage) {
             return replyUserError(interaction, {
                 type: ErrorTypes.VALIDATION,
-                message: 'The image attachment must be an image file.',
+                message: 'All image attachments must be image files.',
             });
         }
 
@@ -116,14 +186,14 @@ export default {
 
         const sentMessage = await channel.send({
             content: message,
-            ...(image ? { files: [image.url] } : {}),
+            ...(images.length ? { files: images.map((image) => image.url) } : {}),
         });
 
         await logEvent({
             client,
             guild: interaction.guild,
             event: {
-                action: image ? 'Bot Message With Image Sent' : 'Bot Message Sent',
+                action: images.length ? 'Bot Message With Images Sent' : 'Bot Message Sent',
                 target: `${channel} (${channel.id})`,
                 executor: `${interaction.user.tag} (${interaction.user.id})`,
                 reason: message.length > 200
@@ -134,8 +204,9 @@ export default {
                     messageId: sentMessage.id,
                     moderatorId: interaction.user.id,
                     messageLength: message.length,
-                    imageName: image?.name || null,
-                    imageUrl: image?.url || null,
+                    imageCount: images.length,
+                    imageNames: images.map((image) => image.name),
+                    imageUrls: images.map((image) => image.url),
                 },
             },
         });

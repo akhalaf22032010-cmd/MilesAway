@@ -47,7 +47,6 @@ export function buildCommandRegistry(client) {
       });
     }
 
-    // Add the main command
     categories.get(categoryKey).commands.push({
       name: command.data.name,
       description: command.data.description || 'No description',
@@ -55,7 +54,6 @@ export function buildCommandRegistry(client) {
       isSubcommand: false,
     });
 
-    // Add subcommands if they exist
     const commandJson = command.data.toJSON?.() || {};
 
     for (const option of commandJson.options || []) {
@@ -110,13 +108,18 @@ export function isProtectedCommand(commandName) {
 
 export function isCommandEnabledInConfig(config, commandName, category) {
   const normalizedName = String(commandName || '').toLowerCase();
+  const normalizedCategory = normalizeCategoryKey(category);
 
-  // Check if it's a subcommand (contains space)
+  // Economy is a public, member-facing system. Its commands must remain
+  // available to every member and cannot be disabled by the command-access UI.
+  if (normalizedCategory === 'economy') {
+    return true;
+  }
+
   const isSubcommand = normalizedName.includes(' ');
   const baseCommand = isSubcommand ? normalizedName.split(' ')[0] : normalizedName;
   const isProtected = isProtectedCommand(baseCommand);
 
-  // Protected commands and their subcommands should always remain enabled.
   if (isProtected) {
     return true;
   }
@@ -124,18 +127,15 @@ export function isCommandEnabledInConfig(config, commandName, category) {
   const disabledCommands = normalizeToggleRecord(config?.disabledCommands);
   const disabledCategories = normalizeToggleRecord(config?.disabledCategories);
 
-  // Check if the specific command/subcommand is disabled
   if (disabledCommands[normalizedName]) {
     return false;
   }
 
-  // For subcommands, also check if the base command is disabled
   if (isSubcommand && disabledCommands[baseCommand]) {
     return false;
   }
 
-  // Check if the category is disabled
-  if (disabledCategories[normalizeCategoryKey(category)]) {
+  if (disabledCategories[normalizedCategory]) {
     return false;
   }
 

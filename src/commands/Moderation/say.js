@@ -40,6 +40,12 @@ export default {
                 .setRequired(true)
                 .setMaxLength(2000),
         )
+        .addAttachmentOption((option) =>
+            option
+                .setName('image')
+                .setDescription('Optional image to send with the message')
+                .setRequired(false),
+        )
         .addChannelOption((option) =>
             option
                 .setName('channel')
@@ -67,11 +73,19 @@ export default {
 
         const rawMessage = interaction.options.getString('message');
         const message = sanitizeInput(rawMessage, 2000);
+        const image = interaction.options.getAttachment('image');
 
         if (!message) {
             return replyUserError(interaction, {
                 type: ErrorTypes.VALIDATION,
                 message: 'Message cannot be empty.',
+            });
+        }
+
+        if (image && !image.contentType?.startsWith('image/')) {
+            return replyUserError(interaction, {
+                type: ErrorTypes.VALIDATION,
+                message: 'The image attachment must be an image file.',
             });
         }
 
@@ -100,13 +114,16 @@ export default {
             });
         }
 
-        const sentMessage = await channel.send({ content: message });
+        const sentMessage = await channel.send({
+            content: message,
+            ...(image ? { files: [image.url] } : {}),
+        });
 
         await logEvent({
             client,
             guild: interaction.guild,
             event: {
-                action: 'Bot Message Sent',
+                action: image ? 'Bot Message With Image Sent' : 'Bot Message Sent',
                 target: `${channel} (${channel.id})`,
                 executor: `${interaction.user.tag} (${interaction.user.id})`,
                 reason: message.length > 200
@@ -117,6 +134,8 @@ export default {
                     messageId: sentMessage.id,
                     moderatorId: interaction.user.id,
                     messageLength: message.length,
+                    imageName: image?.name || null,
+                    imageUrl: image?.url || null,
                 },
             },
         });

@@ -14,6 +14,29 @@ const REMINDER_TIMES = {
     '1d': { label: '1 day', ms: 24 * 60 * 60 * 1000 },
 };
 
+function parseCustomTime(input) {
+    const match = input.trim().toLowerCase().match(/^(\d+)\s*(m|h|d)$/);
+    if (!match) return null;
+
+    const amount = Number(match[1]);
+    const unit = match[2];
+    if (!Number.isInteger(amount) || amount <= 0) return null;
+
+    const multipliers = {
+        m: 60 * 1000,
+        h: 60 * 60 * 1000,
+        d: 24 * 60 * 60 * 1000,
+    };
+
+    const ms = amount * multipliers[unit];
+    const unitLabel = unit === 'm' ? 'minute' : unit === 'h' ? 'hour' : 'day';
+    const label = `${amount} ${unitLabel}${amount === 1 ? '' : 's'}`;
+
+    if (ms > 24 * 60 * 60 * 1000) return null;
+
+    return { label, ms };
+}
+
 export default {
     data: new SlashCommandBuilder()
         .setName('remind')
@@ -29,7 +52,7 @@ export default {
             option
                 .setName('time')
                 .setDescription('When you want to be reminded')
-                .setRequired(true)
+                .setRequired(false)
                 .addChoices(
                     { name: '15 minutes', value: '15m' },
                     { name: '30 minutes', value: '30m' },
@@ -39,6 +62,13 @@ export default {
                     { name: '12 hours', value: '12h' },
                     { name: '1 day', value: '1d' },
                 ),
+        )
+        .addStringOption((option) =>
+            option
+                .setName('custom_time')
+                .setDescription('Custom time: e.g. 45m, 3h, or 1d (max 1 day)')
+                .setRequired(false)
+                .setMaxLength(10),
         )
         .setDefaultMemberPermissions(PermissionFlagsBits.SendMessages)
         .setDMPermission(false),
@@ -51,8 +81,11 @@ export default {
         if (!deferSuccess) return;
 
         const message = interaction.options.getString('message', true).trim();
-        const timeKey = interaction.options.getString('time', true);
-        const reminderTime = REMINDER_TIMES[timeKey];
+        const timeKey = interaction.options.getString('time');
+        const customTimeInput = interaction.options.getString('custom_time');
+        const reminderTime = customTimeInput
+            ? parseCustomTime(customTimeInput)
+            : REMINDER_TIMES[timeKey];
 
         if (!message) {
             return replyUserError(interaction, {
@@ -64,7 +97,9 @@ export default {
         if (!reminderTime) {
             return replyUserError(interaction, {
                 type: ErrorTypes.VALIDATION,
-                message: 'That reminder time is not available.',
+                message: customTimeInput
+                    ? 'Invalid custom time. Use formats like `45m`, `3h`, or `1d` (maximum 1 day).'
+                    : 'Choose a reminder time or enter a custom time.',
             });
         }
 

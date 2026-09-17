@@ -18,6 +18,7 @@ import {
   isValidCountingMessage,
   recordCorrectCount,
 } from '../services/countingGameService.js';
+import { DnrService } from '../services/moderation/dnrService.js';
 
 const MESSAGE_XP_RATE_LIMIT_ATTEMPTS = 12;
 const MESSAGE_XP_RATE_LIMIT_WINDOW_MS = 10000;
@@ -29,6 +30,11 @@ export default {
       if (message.author.bot || !message.guild) return;
 
       logger.debug(`Message received from ${message.author.tag}: ${message.content}`);
+
+      const dnrProcessed = await handleDnrViolation(message);
+      if (dnrProcessed) {
+        return;
+      }
 
       const countingProcessed = await handleCountingGame(message, client);
       if (countingProcessed) {
@@ -43,6 +49,69 @@ export default {
     }
   }
 };
+
+async function handleDnrViolation(message) {
+  try {
+    const protectedUsers = await DnrService.getProtectedUsers(message.guild.id, message.author.id);
+    if (protectedUsers.length === 0) {
+      return false;
+    }
+
+    const mentionedProtectedUser = protectedUsers.find(userId => message.mentions.users.has(userId));
+    let repliedToProtectedUser = null;
+
+    if (message.reference?.messageId) {
+      const referencedMessage = await message.channel.messages.fetch(message.reference.messageId).catch(() => null);
+      if (referencedMessage && protectedUsers.includes(referencedMessage.author.id)) {
+        repliedToProtectedUser = referencedMessage.author.id;
+      }
+    }
+
+    const protectedUserId = mentionedProtectedUser || repliedToProtectedUser;
+    if (!protectedUserId) {
+      return false;
+    }
+
+    const currentWarnings = await DnrService.addWarning(message.guild.id, message.author.id);
+    const warningNumber = Math.min(currentWarnings, 3);
+
+    if (currentWarnings >= 3) {
+      const member = await message.guild.members.fetch(message.author.id).catch(() => null);
+      let timedOut = false;
+
+      if (member?.moderatable) {
+        await member.timeout(5 * 60 * 1000, 'Reached 3 DNR warnings').then(() => {
+          timedOut = true;
+        }).catch(error => {
+          logger.warn(`Failed to timeout DNR violator ${message.author.id}: ${error.message}`);
+        });
+      } else {
+        logger.warn(`Cannot timeout DNR violator ${message.author.id}; bot lacks hierarchy or permission.`);
+      }
+
+      await message.channel.send({
+        content: timedOut
+          ? `🚨 <@${message.author.id}> reached **3/3 DNR warnings** for pinging/replying to <@${protectedUserId}> and has been **timed out for 5 minutes**.`
+          : `🚨 <@${message.author.id}> reached **3/3 DNR warnings** for pinging/replying to <@${protectedUserId}>. I could not apply the 5 minute timeout because of Discord permissions/role hierarchy.`,
+        allowedMentions: {
+          users: [message.author.id, protectedUserId],
+        },
+      }).catch(() => {});
+    } else {
+      await message.channel.send({
+        content: `⚠️ <@${message.author.id}> — DNR warning **${warningNumber}/3**. Do not ping or reply to <@${protectedUserId}>.`,
+        allowedMentions: {
+          users: [message.author.id, protectedUserId],
+        },
+      }).catch(() => {});
+    }
+
+    return true;
+  } catch (error) {
+    logger.error('Error handling DNR violation:', error);
+    return false;
+  }
+}
 
 async function handlePrefixCommand(message, client) {
   try {
@@ -240,7 +309,7 @@ async function handleLeveling(message, client) {
       finalXP = Math.floor(finalXP * levelingConfig.xpMultiplier);
     }
 
-    const result = await addXp(client, message.guild, message.member, finalXP);
+    const result = await addXp(message.client, message.guild, message.member, finalXP);
 
     if (result?.leveledUp) {
       logger.info(

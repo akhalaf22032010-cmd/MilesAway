@@ -129,11 +129,11 @@ function prepareCommandsForRegistration(commands) {
     if (commands.length >= COMMAND_COUNT_WARN_THRESHOLD) logger.warn(`Command count (${commands.length}) is near Discord's ${MAX_COMMANDS} global command limit`);
     if (commands.length <= MAX_COMMANDS) return commands;
     logger.warn(`Command count (${commands.length}) exceeds Discord limit (${MAX_COMMANDS}), truncating...`);
-    const priorityNames = new Set(['say', 'react', 'remind', 'dnr', 'undnr']);
+    const priorityNames = new Set(['say', 'react', 'remind', 'dnr', 'undnr', 'greet', 'welcome', 'goodbye']);
     const priorityCommands = commands.filter((command) => priorityNames.has(command.name));
     const otherCommands = commands.filter((command) => !priorityNames.has(command.name));
     const truncated = [...priorityCommands, ...otherCommands].slice(0, MAX_COMMANDS);
-    logger.info(`Truncated to ${truncated.length} commands for registration; /say, /react, /remind, /dnr, and /undnr were prioritized`);
+    logger.info(`Truncated to ${truncated.length} commands for registration; /say, /react, /remind, /dnr, /undnr, /greet, /welcome, and /goodbye were prioritized`);
     return truncated;
 }
 

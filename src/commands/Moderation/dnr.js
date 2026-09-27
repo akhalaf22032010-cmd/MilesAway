@@ -24,13 +24,12 @@ async function resolveKlipyGifUrl(pageUrl) {
     if (!response.ok) return null;
 
     const html = await response.text();
+    const staticGifs = [...html.matchAll(/https?:\\/\\/(?:static|static1|static2)\\.klipy\\.com\\/[^"'\\s<>]+?\\.gif(?:\\?[^"'\\s<>]*)?/gi)];
+    if (staticGifs.length > 0) {
+      return staticGifs[0][0].replace(/&amp;/g, '&').replace(/\\u0026/g, '&');
+    }
 
-    // KLIPY page markup can change, so don't rely on a single meta-tag
-    // attribute order. Prefer the actual static KLIPY GIF URL.
-    const staticGif = html.match(/https?:\\/\\/(?:static|static1|static2)\\.klipy\\.com\\/[^"'\\s<>]+?\\.gif(?:\\?[^"'\\s<>]*)?/i);
-    if (staticGif) return staticGif[0].replace(/\\\\u0026/g, '&').replace(/&amp;/g, '&');
-
-    const metaTags = html.match(/<meta\b[^>]*>/gi) || [];
+    const metaTags = html.match(/<meta\\b[^>]*>/gi) || [];
     for (const tag of metaTags) {
       const property = tag.match(/(?:property|name)\\s*=\\s*["']([^"']+)["']/i)?.[1]?.toLowerCase();
       const content = tag.match(/content\\s*=\\s*["']([^"']+)["']/i)?.[1];
@@ -38,14 +37,11 @@ async function resolveKlipyGifUrl(pageUrl) {
         return content.replace(/&amp;/g, '&').replace(/\\u0026/g, '&');
       }
     }
-
     return null;
   } catch {
     return null;
   }
 }
-
-const GUARANTEED_FALLBACK_GIF = 'https://static.klipy.com/ii/4e7bea9f7a3371424e6c16ebc93252fe/80/7c/faEUNiNuq5TjUsuXzv.gif';
 
 function dnrEmbed(title, description = null, imageUrl = null) {
   const embed = new EmbedBuilder().setTitle(title);
@@ -109,8 +105,12 @@ export default {
     await addDnr(interaction.client, interaction.guild.id, interaction.user.id, target.id, reason);
     const actorName = interaction.member?.displayName || interaction.user.globalName || interaction.user.username;
     const displayName = targetMember?.displayName || target.displayName || target.username;
-    const gifPage = DNR_GIFS[Math.floor(Math.random() * DNR_GIFS.length)];
-    const gifUrl = (await resolveKlipyGifUrl(gifPage)) || GUARANTEED_FALLBACK_GIF;
+    const shuffledGifPages = [...DNR_GIFS].sort(() => Math.random() - 0.5);
+    let gifUrl = null;
+    for (const gifPage of shuffledGifPages) {
+      gifUrl = await resolveKlipyGifUrl(gifPage);
+      if (gifUrl) break;
+    }
 
     return InteractionHelper.safeReply(interaction, {
       embeds: [dnrEmbed('# 📌 USER DNRD', `**${actorName} DNRED ${displayName}**\n\n**Reason:** ${reason}\n\n**They won't be able to ping/reply to you**`, gifUrl)],

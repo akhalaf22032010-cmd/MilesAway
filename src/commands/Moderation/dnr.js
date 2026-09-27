@@ -87,6 +87,7 @@ export default {
 
     await addDnr(interaction.client, interaction.guild.id, interaction.user.id, target.id);
     const actorName = interaction.member?.displayName || interaction.user.globalName || interaction.user.username;
+    const actorName = interaction.member?.displayName || interaction.user.globalName || interaction.user.username;
     const displayName = targetMember?.displayName || target.displayName || target.username;
     const gifPage = DNR_GIFS[Math.floor(Math.random() * DNR_GIFS.length)];
     const gifUrl = await resolveKlipyGifUrl(gifPage);

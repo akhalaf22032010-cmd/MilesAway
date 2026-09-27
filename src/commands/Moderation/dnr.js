@@ -2,8 +2,20 @@ import { SlashCommandBuilder, MessageFlags, EmbedBuilder, PermissionFlagsBits } 
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { addDnr, getDnrList } from '../../services/moderation/dnrService.js';
 
-function dnrEmbed(title, description) {
-  return new EmbedBuilder().setTitle(title).setDescription(description);
+const DNR_GIFS = [
+  'https://klipy.com/gifs/jon-erik-hexum-dnr',
+  'https://klipy.com/gifs/dnr',
+  'https://klipy.com/gifs/dnr-2',
+  'https://klipy.com/gifs/dnr-bojack',
+  'https://klipy.com/gifs/dnr-didnt-read',
+  'https://klipy.com/gifs/dnr-dnrd',
+  'https://klipy.com/gifs/dnr-7'
+];
+
+function dnrEmbed(description, imageUrl = null) {
+  const embed = new EmbedBuilder().setDescription(description);
+  if (imageUrl) embed.setImage(imageUrl);
+  return embed;
 }
 
 export default {
@@ -42,9 +54,16 @@ export default {
     }
 
     const targetMember = await interaction.guild.members.fetch(target.id).catch(() => null);
-    if (target.id === interaction.guild.ownerId || targetMember?.permissions.has(PermissionFlagsBits.Administrator)) {
+    if (target.id === interaction.guild.ownerId) {
       return InteractionHelper.safeReply(interaction, {
-        embeds: [dnrEmbed('', '❌ You cannot DNR this user\n\n**The server owner and users with Administrator permission cannot be DNRD.**')],
+        embeds: [dnrEmbed('You cannot DNR the Owner!')],
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+
+    if (targetMember?.permissions.has(PermissionFlagsBits.Administrator)) {
+      return InteractionHelper.safeReply(interaction, {
+        embeds: [dnrEmbed('❌ You cannot DNR this user\n\n**Users with Administrator permission cannot be DNRD.**')],
         flags: MessageFlags.Ephemeral,
       });
     }

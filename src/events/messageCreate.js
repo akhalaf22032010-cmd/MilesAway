@@ -61,6 +61,8 @@ async function resolveKlipyGifUrl(pageUrl) {
   }
 }
 
+const GUARANTEED_FALLBACK_GIF = 'https://static.klipy.com/ii/4e7bea9f7a3371424e6c16ebc93252fe/80/7c/faEUNiNuq5TjUsuXzv.gif';
+
 export default {
   name: Events.MessageCreate,
   async execute(message, client) {
@@ -116,7 +118,7 @@ async function handleReplyDnr(message, client) {
     await message.delete().catch(() => {});
 
     const gifPage = DNR_GIFS[Math.floor(Math.random() * DNR_GIFS.length)];
-    const gifUrl = await resolveKlipyGifUrl(gifPage);
+    const gifUrl = (await resolveKlipyGifUrl(gifPage)) || GUARANTEED_FALLBACK_GIF;
     const confirmationEmbed = new EmbedBuilder()
       .setTitle('# 📌 USER DNRD')
       .setDescription(`**${message.member?.displayName || message.author.globalName || message.author.username} DNRED ${targetMember.displayName}**\n\n**Reason:** ${reason}\n\n**They won't be able to ping/reply to you**`);

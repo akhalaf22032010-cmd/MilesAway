@@ -44,7 +44,7 @@ export default {
     const targetMember = await interaction.guild.members.fetch(target.id).catch(() => null);
     if (target.id === interaction.guild.ownerId || targetMember?.permissions.has(PermissionFlagsBits.Administrator)) {
       return InteractionHelper.safeReply(interaction, {
-        embeds: [dnrEmbed('❌ You cannot DNR this user', 'The server owner and users with Administrator permission cannot be DNRD.')],
+        embeds: [dnrEmbed('', '❌ You cannot DNR this user\n\n**The server owner and users with Administrator permission cannot be DNRD.**')],
         flags: MessageFlags.Ephemeral,
       });
     }

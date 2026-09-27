@@ -47,7 +47,7 @@ export default {
   async execute(interaction) {
     const action = interaction.options.getString('action');
     const target = interaction.options.getUser('user');
-    const reason = interaction.options.getString('reason');
+    const reason = interaction.options.getString('reason')?.trim() || 'No reason provided.';
 
     if (action === 'list') {
       const ids = await getDnrList(interaction.client, interaction.guild.id, interaction.user.id);
@@ -60,10 +60,6 @@ export default {
 
     if (!target) {
       return InteractionHelper.safeReply(interaction, { embeds: [dnrEmbed('❌ Missing user', 'Use `/dnr @user` to DNR someone, or `/dnr list` to view your list.')], flags: MessageFlags.Ephemeral });
-    }
-
-    if (!reason?.trim()) {
-      return InteractionHelper.safeReply(interaction, { embeds: [dnrEmbed('❌ Missing reason', 'You must provide a reason when DNRing someone.')], flags: MessageFlags.Ephemeral });
     }
 
     if (target.id === interaction.user.id) {

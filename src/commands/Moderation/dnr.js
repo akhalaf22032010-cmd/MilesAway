@@ -12,7 +12,20 @@ const DNR_GIFS = [
   'https://klipy.com/gifs/dnr-7'
 ];
 
-function dnrEmbed(description, imageUrl = null) {
+async function resolveKlipyGifUrl(pageUrl) {
+  try {
+    const response = await fetch(pageUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    if (!response.ok) return null;
+    const html = await response.text();
+    const match = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
+      || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+    return match ? match[1].replace(/&amp;/g, '&') : null;
+  } catch {
+    return null;
+  }
+}
+
+async function dnrEmbed(description, imageUrl = null) {
   const embed = new EmbedBuilder().setDescription(description);
   if (imageUrl) embed.setImage(imageUrl);
   return embed;
@@ -70,9 +83,11 @@ export default {
 
     await addDnr(interaction.client, interaction.guild.id, interaction.user.id, target.id);
     const displayName = targetMember?.displayName || target.displayName || target.username;
+    const gifPage = DNR_GIFS[Math.floor(Math.random() * DNR_GIFS.length)];
+    const gifUrl = await resolveKlipyGifUrl(gifPage);
 
     return InteractionHelper.safeReply(interaction, {
-      embeds: [dnrEmbed(`# 📌 you DNRED ${displayName}`, '**They won\'t be able to ping/reply to you**')],
+      embeds: [await dnrEmbed(`# 📌 you DNRED ${displayName}`, '**They won\'t be able to ping/reply to you**', gifUrl)],
     });
   },
 };

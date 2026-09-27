@@ -29,6 +29,7 @@ const DNR_GIFS = [
   'https://klipy.com/gifs/dnr-bojack',
   'https://klipy.com/gifs/dnr-didnt-read',
   'https://klipy.com/gifs/dnr-dnrd',
+  'https://klipy.com/gifs/loox-androgenicogre-2',
   'https://klipy.com/gifs/dnr-7'
 ];
 

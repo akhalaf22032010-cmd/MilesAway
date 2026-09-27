@@ -35,46 +35,46 @@ async function resolveKlipyGifUrl(pageUrl) {
         .replace(/&amp;/g, '&')
         .replace(/&#x26;/gi, '&')
         .replace(/&#38;/g, '&')
-        .replace(/\\u0026/gi, '&')
-        .replace(/\\u002F/gi, '/')
-        .replace(/\\\\/g, '');
+        .replace(/\u0026/gi, '&')
+        .replace(/\u002F/gi, '/')
+        .replace(/\\/g, '');
       try {
         const url = new URL(decoded, 'https://klipy.com').href;
         candidates.add(url);
       } catch {}
     };
 
-    const mediaPattern = /https?:\\/\\/(?:static\\d*|media|cdn)\\.klipy\\.com\\/[^"'<>\\s\\\\]+/gi;
+    const mediaPattern = /https?:\/\/(?:static\d*|media|cdn)\.klipy\.com\/[^"'<>\s\\]+/gi;
     for (const match of html.matchAll(mediaPattern)) addCandidate(match[0]);
 
-    const metaTags = html.match(/<meta\\b[^>]*>/gi) || [];
+    const metaTags = html.match(/<meta\b[^>]*>/gi) || [];
     for (const tag of metaTags) {
-      const property = tag.match(/(?:property|name)\\s*=\\s*["']([^"']+)["']/i)?.[1]?.toLowerCase();
-      const content = tag.match(/content\\s*=\\s*["']([^"']+)["']/i)?.[1];
+      const property = tag.match(/(?:property|name)\s*=\s*["']([^"']+)["']/i)?.[1]?.toLowerCase();
+      const content = tag.match(/content\s*=\s*["']([^"']+)["']/i)?.[1];
       if (content && (property === 'og:image' || property === 'og:image:url' || property === 'twitter:image')) {
         addCandidate(content);
       }
     }
 
     const jsonPatterns = [
-      /"(?:contentUrl|content_url|image|imageUrl|image_url|gifUrl|gif_url|mediaUrl|media_url)"\\s*:\\s*"([^"]+)"/gi,
-      /(?:contentUrl|content_url|imageUrl|image_url|gifUrl|gif_url|mediaUrl|media_url)\\s*=\\s*["']([^"']+)["']/gi,
+      /"(?:contentUrl|content_url|image|imageUrl|image_url|gifUrl|gif_url|mediaUrl|media_url)"\s*:\s*"([^"]+)"/gi,
+      /(?:contentUrl|content_url|imageUrl|image_url|gifUrl|gif_url|mediaUrl|media_url)\s*=\s*["']([^"']+)["']/gi,
     ];
     for (const pattern of jsonPatterns) {
       for (const match of html.matchAll(pattern)) addCandidate(match[1]);
     }
 
     for (const candidate of candidates) {
-      if (/^https?:\\/\\/(?:static\\d*|media|cdn)\\.klipy\\.com\\//i.test(candidate) &&
-          /\\.gif(?:[?#].*)?$/i.test(candidate)) return candidate;
+      if (/^https?:\/\/(?:static\d*|media|cdn)\.klipy\.com\//i.test(candidate) &&
+          /\.gif(?:[?#].*)?$/i.test(candidate)) return candidate;
     }
     for (const candidate of candidates) {
-      if (/^https?:\\/\\/(?:static\\d*|media|cdn)\\.klipy\\.com\\//i.test(candidate) &&
-          /\\.(?:gif|webp|png|jpe?g)(?:[?#].*)?$/i.test(candidate)) return candidate;
+      if (/^https?:\/\/(?:static\d*|media|cdn)\.klipy\.com\//i.test(candidate) &&
+          /\.(?:gif|webp|png|jpe?g)(?:[?#].*)?$/i.test(candidate)) return candidate;
     }
     for (const candidate of candidates) {
-      if (/^https?:\\/\\//i.test(candidate) &&
-          /\\.(?:gif|webp|png|jpe?g)(?:[?#].*)?$/i.test(candidate)) return candidate;
+      if (/^https?:\/\//i.test(candidate) &&
+          /\.(?:gif|webp|png|jpe?g)(?:[?#].*)?$/i.test(candidate)) return candidate;
     }
 
     return null;

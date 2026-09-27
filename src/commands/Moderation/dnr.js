@@ -24,17 +24,17 @@ async function resolveKlipyGifUrl(pageUrl) {
     if (!response.ok) return null;
 
     const html = await response.text();
-    const staticGifs = [...html.matchAll(/https?:\\/\\/(?:static|static1|static2)\\.klipy\\.com\\/[^"'\\s<>]+?\\.gif(?:\\?[^"'\\s<>]*)?/gi)];
+    const staticGifs = [...html.matchAll(/https?:\/\/(?:static|static1|static2)\.klipy\.com\/[^"'\s<>]+?\.gif(?:\?[^"'\s<>]*)?/gi)];
     if (staticGifs.length > 0) {
       return staticGifs[0][0].replace(/&amp;/g, '&').replace(/\\u0026/g, '&');
     }
 
-    const metaTags = html.match(/<meta\\b[^>]*>/gi) || [];
+    const metaTags = html.match(/<meta\b[^>]*>/gi) || [];
     for (const tag of metaTags) {
-      const property = tag.match(/(?:property|name)\\s*=\\s*["']([^"']+)["']/i)?.[1]?.toLowerCase();
-      const content = tag.match(/content\\s*=\\s*["']([^"']+)["']/i)?.[1];
+      const property = tag.match(/(?:property|name)\s*=\s*["']([^"']+)["']/i)?.[1]?.toLowerCase();
+      const content = tag.match(/content\s*=\s*["']([^"']+)["']/i)?.[1];
       if (content && (property === 'og:image' || property === 'twitter:image')) {
-        return content.replace(/&amp;/g, '&').replace(/\\u0026/g, '&');
+        return content.replace(/&amp;/g, '&').replace(/\u0026/g, '&');
       }
     }
     return null;

@@ -25,7 +25,7 @@ async function resolveKlipyGifUrl(pageUrl) {
   }
 }
 
-async function dnrEmbed(description, imageUrl = null) {
+function dnrEmbed(description, imageUrl = null) {
   const embed = new EmbedBuilder().setDescription(description);
   if (imageUrl) embed.setImage(imageUrl);
   return embed;
@@ -82,6 +82,7 @@ export default {
     }
 
     await addDnr(interaction.client, interaction.guild.id, interaction.user.id, target.id);
+    const actorName = interaction.member?.displayName || interaction.user.globalName || interaction.user.username;
     const displayName = targetMember?.displayName || target.displayName || target.username;
     const gifPage = DNR_GIFS[Math.floor(Math.random() * DNR_GIFS.length)];
     const gifUrl = await resolveKlipyGifUrl(gifPage);

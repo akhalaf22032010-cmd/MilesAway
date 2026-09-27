@@ -37,22 +37,24 @@ async function resolveKlipyGifUrl(pageUrl) {
   try {
     const response = await fetch(pageUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/136 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml',
       },
     });
     if (!response.ok) return null;
+
     const html = await response.text();
+    const staticGifs = [...html.matchAll(/https?:\\/\\/(?:static|static1|static2)\\.klipy\\.com\\/[^"'\\s<>]+?\\.gif(?:\\?[^"'\\s<>]*)?/gi)];
+    if (staticGifs.length > 0) {
+      return staticGifs[0][0].replace(/&amp;/g, '&').replace(/\\u0026/g, '&');
+    }
 
-    const staticGif = html.match(/https?:\/\/(?:static|static1|static2)\.klipy\.com\/[^"'\s<>]+?\.gif(?:\?[^"'\s<>]*)?/i);
-    if (staticGif) return staticGif[0].replace(/&amp;/g, '&');
-
-    const metaTags = html.match(/<meta\b[^>]*>/gi) || [];
+    const metaTags = html.match(/<meta\\b[^>]*>/gi) || [];
     for (const tag of metaTags) {
-      const property = tag.match(/(?:property|name)\s*=\s*["']([^"']+)["']/i)?.[1]?.toLowerCase();
-      const content = tag.match(/content\s*=\s*["']([^"']+)["']/i)?.[1];
+      const property = tag.match(/(?:property|name)\\s*=\\s*["']([^"']+)["']/i)?.[1]?.toLowerCase();
+      const content = tag.match(/content\\s*=\\s*["']([^"']+)["']/i)?.[1];
       if (content && (property === 'og:image' || property === 'twitter:image')) {
-        return content.replace(/&amp;/g, '&');
+        return content.replace(/&amp;/g, '&').replace(/\\u0026/g, '&');
       }
     }
     return null;
@@ -60,8 +62,6 @@ async function resolveKlipyGifUrl(pageUrl) {
     return null;
   }
 }
-
-const GUARANTEED_FALLBACK_GIF = 'https://static.klipy.com/ii/4e7bea9f7a3371424e6c16ebc93252fe/80/7c/faEUNiNuq5TjUsuXzv.gif';
 
 export default {
   name: Events.MessageCreate,
@@ -117,8 +117,12 @@ async function handleReplyDnr(message, client) {
     await addDnr(client, message.guild.id, message.author.id, targetUser.id, reason);
     await message.delete().catch(() => {});
 
-    const gifPage = DNR_GIFS[Math.floor(Math.random() * DNR_GIFS.length)];
-    const gifUrl = (await resolveKlipyGifUrl(gifPage)) || GUARANTEED_FALLBACK_GIF;
+    const shuffledGifPages = [...DNR_GIFS].sort(() => Math.random() - 0.5);
+    let gifUrl = null;
+    for (const gifPage of shuffledGifPages) {
+      gifUrl = await resolveKlipyGifUrl(gifPage);
+      if (gifUrl) break;
+    }
     const confirmationEmbed = new EmbedBuilder()
       .setTitle('# 📌 USER DNRD')
       .setDescription(`**${message.member?.displayName || message.author.globalName || message.author.username} DNRED ${targetMember.displayName}**\n\n**Reason:** ${reason}\n\n**They won't be able to ping/reply to you**`);

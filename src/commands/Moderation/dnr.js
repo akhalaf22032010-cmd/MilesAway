@@ -27,24 +27,25 @@ async function resolveKlipyGifUrl(pageUrl) {
     if (!response.ok) return null;
 
     const html = await response.text();
-    const candidates = new Set();
+    const directCandidates = new Set();
+    const pageCandidates = new Set();
 
-    const addCandidate = (value) => {
+    const addCandidate = (value, targetSet = directCandidates) => {
       if (!value) return;
       let decoded = value.trim()
         .replace(/&amp;/g, '&')
         .replace(/&#x26;/gi, '&')
         .replace(/&#38;/g, '&')
-        .replace(/\u0026/gi, '&')
-        .replace(/\u002F/gi, '/')
+        .replace(/\\u0026/gi, '&')
+        .replace(/\\u002F/gi, '/')
+        .replace(/%2F/gi, '/')
+        .replace(/%3A/gi, ':')
         .replace(/\\/g, '');
       try {
-        const url = new URL(decoded, 'https://klipy.com').href;
-        candidates.add(url);
+        targetSet.add(new URL(decoded, 'https://klipy.com').href);
       } catch {}
     };
 
-    // KLIPY pages may contain escaped direct media URLs.
     const normalizedHtml = html
       .replace(/\\\//g, '/')
       .replace(/\\u002F/gi, '/')
@@ -52,46 +53,43 @@ async function resolveKlipyGifUrl(pageUrl) {
       .replace(/%2F/gi, '/')
       .replace(/%3A/gi, ':');
 
-    const mediaPattern = /https?:\/\/(?:static\d*|media|cdn)\.klipy\.com\/[^"'<>\s\\]+/gi;
-    for (const match of normalizedHtml.matchAll(mediaPattern)) addCandidate(match[0]);
-
-    // KLIPY may hide the direct GIF URL inside encoded HTML/JSON.
-    const absoluteUrlPattern = /https?:\/\/[^"'<>\s\\]+/gi;
-    for (const match of normalizedHtml.matchAll(absoluteUrlPattern)) {
-      if (/klipy\.com\//i.test(match[0]) && /\.gif(?:[?#].*)?$/i.test(match[0])) {
-        addCandidate(match[0]);
-      }
-    }
-
-    // Handle OG/Twitter tags regardless of attribute order.
-    const metaTags = normalizedHtml.match(/<meta\b[^>]*>/gi) || [];
+    // Prefer metadata belonging to THIS KLIPY page. This avoids selecting
+    // a random GIF from a related-content section on the page.
+    const metaTags = normalizedHtml.match(/<meta\\b[^>]*>/gi) || [];
     for (const tag of metaTags) {
-      const property = tag.match(/(?:property|name)\s*=\s*["']([^"']+)["']/i)?.[1]?.toLowerCase();
-      const content = tag.match(/content\s*=\s*["']([^"']+)["']/i)?.[1];
+      const property = tag.match(/(?:property|name)\\s*=\\s*["']([^"']+)["']/i)?.[1]?.toLowerCase();
+      const content = tag.match(/content\\s*=\\s*["']([^"']+)["']/i)?.[1];
       if (content && (property === 'og:image' || property === 'og:image:url' || property === 'twitter:image')) {
-        addCandidate(content);
+        addCandidate(content, pageCandidates);
       }
     }
 
+    // Structured data can also expose the exact media attached to this page.
     const jsonPatterns = [
-      /"(?:contentUrl|content_url|image|imageUrl|image_url|gifUrl|gif_url|mediaUrl|media_url)"\s*:\s*"([^"]+)"/gi,
-      /(?:contentUrl|content_url|imageUrl|image_url|gifUrl|gif_url|mediaUrl|media_url)\s*=\s*["']([^"']+)["']/gi,
+      /"(?:contentUrl|content_url|image|imageUrl|image_url|gifUrl|gif_url|mediaUrl|media_url)"\\s*:\\s*"([^"]+)"/gi,
+      /(?:contentUrl|content_url|imageUrl|image_url|gifUrl|gif_url|mediaUrl|media_url)\\s*=\\s*["']([^"']+)["']/gi,
     ];
     for (const pattern of jsonPatterns) {
-      for (const match of html.matchAll(pattern)) addCandidate(match[1]);
+      for (const match of normalizedHtml.matchAll(pattern)) addCandidate(match[1], pageCandidates);
     }
 
-    for (const candidate of candidates) {
-      if (/^https?:\/\/(?:static\d*|media|cdn)\.klipy\.com\//i.test(candidate) &&
-          /\.gif(?:[?#].*)?$/i.test(candidate)) return candidate;
+    const isKlipyMedia = (url) =>
+      /^https?:\\/\\/(?:static\\d*|media|cdn)\\.klipy\\.com\\//i.test(url);
+
+    const isImage = (url) =>
+      /\\.(?:gif|webp|png|jpe?g)(?:[?#].*)?$/i.test(url);
+
+    // Only accept a page-specific media URL first.
+    for (const candidate of pageCandidates) {
+      if (isKlipyMedia(candidate) && isImage(candidate)) return candidate;
     }
-    for (const candidate of candidates) {
-      if (/^https?:\/\/(?:static\d*|media|cdn)\.klipy\.com\//i.test(candidate) &&
-          /\.(?:gif|webp|png|jpe?g)(?:[?#].*)?$/i.test(candidate)) return candidate;
-    }
-    for (const candidate of candidates) {
-      if (/^https?:\/\//i.test(candidate) &&
-          /\.(?:gif|webp|png|jpe?g)(?:[?#].*)?$/i.test(candidate)) return candidate;
+
+    // Fallback: scan only KLIPY's direct media hosts, never arbitrary URLs.
+    const mediaPattern = /https?:\\/\\/(?:static\\d*|media|cdn)\\.klipy\\.com\\/[^"'<>\\s\\\\]+/gi;
+    for (const match of normalizedHtml.matchAll(mediaPattern)) addCandidate(match[0]);
+
+    for (const candidate of directCandidates) {
+      if (isKlipyMedia(candidate) && isImage(candidate)) return candidate;
     }
 
     return null;

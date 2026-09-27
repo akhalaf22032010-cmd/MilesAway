@@ -32,6 +32,19 @@ const DNR_GIFS = [
   'https://klipy.com/gifs/dnr-7'
 ];
 
+async function resolveKlipyGifUrl(pageUrl) {
+  try {
+    const response = await fetch(pageUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    if (!response.ok) return null;
+    const html = await response.text();
+    const match = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
+      || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+    return match ? match[1].replace(/&amp;/g, '&') : null;
+  } catch {
+    return null;
+  }
+}
+
 export default {
   name: Events.MessageCreate,
   async execute(message, client) {
@@ -83,8 +96,14 @@ async function handleReplyDnr(message, client) {
     await addDnr(client, message.guild.id, message.author.id, targetUser.id);
     await message.delete().catch(() => {});
 
+    const gifPage = DNR_GIFS[Math.floor(Math.random() * DNR_GIFS.length)];
+    const gifUrl = await resolveKlipyGifUrl(gifPage);
+    const confirmationEmbed = new EmbedBuilder()
+      .setDescription(`# 📌 you DNRED ${targetMember.displayName}\n\n**They won't be able to ping/reply to you**`);
+    if (gifUrl) confirmationEmbed.setImage(gifUrl);
+
     await message.channel.send({
-      embeds: [new EmbedBuilder().setDescription(`# 📌 you DNRED ${targetMember.displayName}\n\n**They won't be able to ping/reply to you**`)],
+      embeds: [confirmationEmbed],
     }).catch(() => {});
 
     return true;

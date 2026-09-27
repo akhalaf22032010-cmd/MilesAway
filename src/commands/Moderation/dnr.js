@@ -48,10 +48,20 @@ async function resolveKlipyGifUrl(pageUrl) {
     const normalizedHtml = html
       .replace(/\\\//g, '/')
       .replace(/\\u002F/gi, '/')
-      .replace(/\\u0026/gi, '&');
+      .replace(/\\u0026/gi, '&')
+      .replace(/%2F/gi, '/')
+      .replace(/%3A/gi, ':');
 
     const mediaPattern = /https?:\/\/(?:static\d*|media|cdn)\.klipy\.com\/[^"'<>\s\\]+/gi;
     for (const match of normalizedHtml.matchAll(mediaPattern)) addCandidate(match[0]);
+
+    // KLIPY may hide the direct GIF URL inside encoded HTML/JSON.
+    const absoluteUrlPattern = /https?:\/\/[^"'<>\s\\]+/gi;
+    for (const match of normalizedHtml.matchAll(absoluteUrlPattern)) {
+      if (/klipy\.com\//i.test(match[0]) && /\.gif(?:[?#].*)?$/i.test(match[0])) {
+        addCandidate(match[0]);
+      }
+    }
 
     // Handle OG/Twitter tags regardless of attribute order.
     const metaTags = normalizedHtml.match(/<meta\b[^>]*>/gi) || [];

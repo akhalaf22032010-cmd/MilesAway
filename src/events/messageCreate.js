@@ -68,11 +68,15 @@ async function handleReplyDnr(message, client) {
     const targetMember = await message.guild.members.fetch(targetUser.id).catch(() => null);
     if (!targetMember) return false;
 
-    if (targetUser.id === message.guild.ownerId || targetMember.permissions.has(PermissionFlagsBits.Administrator)) {
+    if (targetUser.id === message.guild.ownerId) {
       await message.delete().catch(() => {});
-      await message.channel.send({
-        embeds: [new EmbedBuilder().setDescription('❌ You cannot DNR this user\n\n**The server owner and users with Administrator permission cannot be DNRD.**')],
-      }).catch(() => {});
+      await message.author.send({ embeds: [new EmbedBuilder().setDescription('You cannot DNR the Owner!')] }).catch(() => {});
+      return true;
+    }
+
+    if (targetMember.permissions.has(PermissionFlagsBits.Administrator)) {
+      await message.delete().catch(() => {});
+      await message.author.send({ embeds: [new EmbedBuilder().setDescription('❌ You cannot DNR this user\\n\\n**Users with Administrator permission cannot be DNRD.**')] }).catch(() => {});
       return true;
     }
 

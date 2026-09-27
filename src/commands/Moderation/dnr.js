@@ -15,12 +15,31 @@ const DNR_GIFS = [
 
 async function resolveKlipyGifUrl(pageUrl) {
   try {
-    const response = await fetch(pageUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const response = await fetch(pageUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/136 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml',
+      },
+    });
     if (!response.ok) return null;
+
     const html = await response.text();
-    const match = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
-      || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
-    return match ? match[1].replace(/&amp;/g, '&') : null;
+
+    // KLIPY page markup can change, so don't rely on a single meta-tag
+    // attribute order. Prefer the actual static KLIPY GIF URL.
+    const staticGif = html.match(/https?:\\/\\/(?:static|static1|static2)\\.klipy\\.com\\/[^"'\\s<>]+?\\.gif(?:\\?[^"'\\s<>]*)?/i);
+    if (staticGif) return staticGif[0].replace(/\\\\u0026/g, '&').replace(/&amp;/g, '&');
+
+    const metaTags = html.match(/<meta\\b[^>]*>/gi) || [];
+    for (const tag of metaTags) {
+      const property = tag.match(/(?:property|name)\\s*=\\s*["']([^"']+)["']/i)?.[1]?.toLowerCase();
+      const content = tag.match(/content\\s*=\\s*["']([^"']+)["']/i)?.[1];
+      if (content && (property === 'og:image' || property === 'twitter:image')) {
+        return content.replace(/&amp;/g, '&').replace(/\\\\u0026/g, '&');
+      }
+    }
+
+    return null;
   } catch {
     return null;
   }

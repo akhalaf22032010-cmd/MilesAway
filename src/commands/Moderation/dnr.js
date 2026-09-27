@@ -16,33 +16,72 @@ const DNR_GIFS = [
 async function resolveKlipyGifUrl(pageUrl) {
   try {
     const response = await fetch(pageUrl, {
+      redirect: 'follow',
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/136 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml',
+        'Accept': 'text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Referer': 'https://klipy.com/',
       },
     });
     if (!response.ok) return null;
 
     const html = await response.text();
-    const staticGifs = [...html.matchAll(/https?:\/\/(?:static|static1|static2)\.klipy\.com\/[^"'\s<>]+?\.gif(?:\?[^"'\s<>]*)?/gi)];
-    if (staticGifs.length > 0) {
-      return staticGifs[0][0].replace(/&amp;/g, '&').replace(/\\u0026/g, '&');
-    }
+    const candidates = new Set();
 
-    const metaTags = html.match(/<meta\b[^>]*>/gi) || [];
+    const addCandidate = (value) => {
+      if (!value) return;
+      let decoded = value.trim()
+        .replace(/&amp;/g, '&')
+        .replace(/&#x26;/gi, '&')
+        .replace(/&#38;/g, '&')
+        .replace(/\\u0026/gi, '&')
+        .replace(/\\u002F/gi, '/')
+        .replace(/\\\\/g, '');
+      try {
+        const url = new URL(decoded, 'https://klipy.com').href;
+        candidates.add(url);
+      } catch {}
+    };
+
+    const mediaPattern = /https?:\\/\\/(?:static\\d*|media|cdn)\\.klipy\\.com\\/[^"'<>\\s\\\\]+/gi;
+    for (const match of html.matchAll(mediaPattern)) addCandidate(match[0]);
+
+    const metaTags = html.match(/<meta\\b[^>]*>/gi) || [];
     for (const tag of metaTags) {
-      const property = tag.match(/(?:property|name)\s*=\s*["']([^"']+)["']/i)?.[1]?.toLowerCase();
-      const content = tag.match(/content\s*=\s*["']([^"']+)["']/i)?.[1];
-      if (content && (property === 'og:image' || property === 'twitter:image')) {
-        return content.replace(/&amp;/g, '&').replace(/\u0026/g, '&');
+      const property = tag.match(/(?:property|name)\\s*=\\s*["']([^"']+)["']/i)?.[1]?.toLowerCase();
+      const content = tag.match(/content\\s*=\\s*["']([^"']+)["']/i)?.[1];
+      if (content && (property === 'og:image' || property === 'og:image:url' || property === 'twitter:image')) {
+        addCandidate(content);
       }
     }
+
+    const jsonPatterns = [
+      /"(?:contentUrl|content_url|image|imageUrl|image_url|gifUrl|gif_url|mediaUrl|media_url)"\\s*:\\s*"([^"]+)"/gi,
+      /(?:contentUrl|content_url|imageUrl|image_url|gifUrl|gif_url|mediaUrl|media_url)\\s*=\\s*["']([^"']+)["']/gi,
+    ];
+    for (const pattern of jsonPatterns) {
+      for (const match of html.matchAll(pattern)) addCandidate(match[1]);
+    }
+
+    for (const candidate of candidates) {
+      if (/^https?:\\/\\/(?:static\\d*|media|cdn)\\.klipy\\.com\\//i.test(candidate) &&
+          /\\.gif(?:[?#].*)?$/i.test(candidate)) return candidate;
+    }
+    for (const candidate of candidates) {
+      if (/^https?:\\/\\/(?:static\\d*|media|cdn)\\.klipy\\.com\\//i.test(candidate) &&
+          /\\.(?:gif|webp|png|jpe?g)(?:[?#].*)?$/i.test(candidate)) return candidate;
+    }
+    for (const candidate of candidates) {
+      if (/^https?:\\/\\//i.test(candidate) &&
+          /\\.(?:gif|webp|png|jpe?g)(?:[?#].*)?$/i.test(candidate)) return candidate;
+    }
+
     return null;
   } catch {
     return null;
   }
 }
-
 function dnrEmbed(title, description = null, imageUrl = null) {
   const embed = new EmbedBuilder().setTitle(title);
   if (description) embed.setDescription(description);

@@ -24,72 +24,45 @@ async function resolveKlipyGifUrl(pageUrl) {
         'Referer': 'https://klipy.com/',
       },
     });
+
     if (!response.ok) return null;
 
     const html = await response.text();
-    const directCandidates = new Set();
-    const pageCandidates = new Set();
+    const candidates = new Set();
 
-    const addCandidate = (value, targetSet = directCandidates) => {
-      if (!value) return;
-      let decoded = value.trim()
-        .replace(/&amp;/g, '&')
-        .replace(/&#x26;/gi, '&')
-        .replace(/&#38;/g, '&')
-        .replace(/\\u0026/gi, '&')
-        .replace(/\\u002F/gi, '/')
-        .replace(/%2F/gi, '/')
-        .replace(/%3A/gi, ':')
-        .replace(/\\/g, '');
-      try {
-        targetSet.add(new URL(decoded, 'https://klipy.com').href);
-      } catch {}
-    };
-
-    const normalizedHtml = html
-      .replace(/\\\//g, '/')
+    const normalize = (value) => String(value || '')
+      .trim()
       .replace(/\\u002F/gi, '/')
       .replace(/\\u0026/gi, '&')
+      .replace(/\\\//g, '/')
+      .replace(/&amp;/g, '&')
       .replace(/%2F/gi, '/')
       .replace(/%3A/gi, ':');
 
-    // Prefer metadata belonging to THIS KLIPY page. This avoids selecting
-    // a random GIF from a related-content section on the page.
-    const metaTags = normalizedHtml.match(/<meta\\b[^>]*>/gi) || [];
+    const add = (value) => {
+      const normalized = normalize(value);
+      const match = normalized.match(/https?:\/\/(?:static\d*|media|cdn)\.klipy\.com\/[^"'<>\s\\]+/i);
+      if (match) candidates.add(match[0]);
+    };
+
+    const metaTags = html.match(/<meta\b[^>]*>/gi) || [];
     for (const tag of metaTags) {
-      const property = tag.match(/(?:property|name)\\s*=\\s*["']([^"']+)["']/i)?.[1]?.toLowerCase();
-      const content = tag.match(/content\\s*=\\s*["']([^"']+)["']/i)?.[1];
-      if (content && (property === 'og:image' || property === 'og:image:url' || property === 'twitter:image')) {
-        addCandidate(content, pageCandidates);
-      }
+      const property = tag.match(/(?:property|name)\s*=\s*["']([^"']+)["']/i)?.[1]?.toLowerCase();
+      const content = tag.match(/content\s*=\s*["']([^"']+)["']/i)?.[1];
+      if (content && ['og:image', 'og:image:url', 'twitter:image'].includes(property)) add(content);
     }
 
-    // Structured data can also expose the exact media attached to this page.
-    const jsonPatterns = [
-      /"(?:contentUrl|content_url|image|imageUrl|image_url|gifUrl|gif_url|mediaUrl|media_url)"\\s*:\\s*"([^"]+)"/gi,
-      /(?:contentUrl|content_url|imageUrl|image_url|gifUrl|gif_url|mediaUrl|media_url)\\s*=\\s*["']([^"']+)["']/gi,
-    ];
-    for (const pattern of jsonPatterns) {
-      for (const match of normalizedHtml.matchAll(pattern)) addCandidate(match[1], pageCandidates);
+    const structured = html.match(/"(?:contentUrl|content_url|gifUrl|gif_url|mediaUrl|media_url|imageUrl|image_url)"\s*:\s*"([^"]+)"/gi) || [];
+    for (const entry of structured) {
+      const value = entry.match(/:\s*"([^"]+)"/i)?.[1];
+      if (value) add(value);
     }
 
-    const isKlipyMedia = (url) =>
-      /^https?:\\/\\/(?:static\\d*|media|cdn)\\.klipy\\.com\\//i.test(url);
+    const directMedia = html.match(/https?:\/\/(?:static\d*|media|cdn)\.klipy\.com\/[^"'<>\s\\]+/gi) || [];
+    for (const url of directMedia) add(url);
 
-    const isImage = (url) =>
-      /\\.(?:gif|webp|png|jpe?g)(?:[?#].*)?$/i.test(url);
-
-    // Only accept a page-specific media URL first.
-    for (const candidate of pageCandidates) {
-      if (isKlipyMedia(candidate) && isImage(candidate)) return candidate;
-    }
-
-    // Fallback: scan only KLIPY's direct media hosts, never arbitrary URLs.
-    const mediaPattern = /https?:\\/\\/(?:static\\d*|media|cdn)\\.klipy\\.com\\/[^"'<>\\s\\\\]+/gi;
-    for (const match of normalizedHtml.matchAll(mediaPattern)) addCandidate(match[0]);
-
-    for (const candidate of directCandidates) {
-      if (isKlipyMedia(candidate) && isImage(candidate)) return candidate;
+    for (const url of candidates) {
+      if (/\.gif(?:[?#].*)?$/i.test(url)) return url;
     }
 
     return null;
@@ -97,6 +70,7 @@ async function resolveKlipyGifUrl(pageUrl) {
     return null;
   }
 }
+
 function dnrEmbed(title, description = null, imageUrl = null) {
   const embed = new EmbedBuilder().setTitle(title);
   if (description) embed.setDescription(description);

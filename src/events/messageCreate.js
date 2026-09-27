@@ -72,7 +72,11 @@ export default {
 };
 
 async function handleReplyDnr(message, client) {
-  if (message.content.trim() !== '/dnr' || !message.reference?.messageId) return false;
+  if (!message.reference?.messageId) return false;
+  const raw = message.content.trim();
+  if (!raw.toLowerCase().startsWith('/dnr')) return false;
+  const reason = raw.slice(4).trim();
+  if (!reason) return true;
 
   try {
     const referencedMessage = await message.channel.messages.fetch(message.reference.messageId).catch(() => null);

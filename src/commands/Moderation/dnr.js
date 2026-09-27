@@ -45,6 +45,8 @@ async function resolveKlipyGifUrl(pageUrl) {
   }
 }
 
+const GUARANTEED_FALLBACK_GIF = 'https://static.klipy.com/ii/4e7bea9f7a3371424e6c16ebc93252fe/80/7c/faEUNiNuq5TjUsuXzv.gif';
+
 function dnrEmbed(title, description = null, imageUrl = null) {
   const embed = new EmbedBuilder().setTitle(title);
   if (description) embed.setDescription(description);
@@ -108,7 +110,7 @@ export default {
     const actorName = interaction.member?.displayName || interaction.user.globalName || interaction.user.username;
     const displayName = targetMember?.displayName || target.displayName || target.username;
     const gifPage = DNR_GIFS[Math.floor(Math.random() * DNR_GIFS.length)];
-    const gifUrl = await resolveKlipyGifUrl(gifPage);
+    const gifUrl = (await resolveKlipyGifUrl(gifPage)) || GUARANTEED_FALLBACK_GIF;
 
     return InteractionHelper.safeReply(interaction, {
       embeds: [dnrEmbed('# 📌 USER DNRD', `**${actorName} DNRED ${displayName}**\n\n**Reason:** ${reason}\n\n**They won't be able to ping/reply to you**`, gifUrl)],

@@ -1,4 +1,4 @@
-import { Events, EmbedBuilder } from 'discord.js';
+import { Events, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
 import { logger } from '../utils/logger.js';
 import { getLevelingConfig, getUserLevelData } from '../services/leveling/leveling.js';
 import { addXp } from '../services/leveling/xpSystem.js';
@@ -12,7 +12,7 @@ import { getCommandPrefix, getBotMessage, isBotOwner, isCommandCategoryEnabled, 
 import { enforceAbuseProtection, formatCooldownDuration } from '../utils/abuseProtection.js';
 import { createEmbed } from '../utils/embeds.js';
 import { isCommandEnabled } from '../services/commandAccessService.js';
-import { getDnrerIdsForTarget } from '../services/moderation/dnrService.js';
+import { addDnr, getDnrerIdsForTarget } from '../services/moderation/dnrService.js';
 import {
   getCountingGameConfig,
   saveCountingGameConfig,
@@ -31,7 +31,10 @@ export default {
 
       logger.debug(`Message received from ${message.author.tag}: ${message.content}`);
 
-      const dnrProcessed = await handleDnrProtection(message);
+      const dnrCommandProcessed = await handleReplyDnr(message, client);
+      if (dnrCommandProcessed) return;
+
+      const dnrProcessed = await handleDnrProtection(message, client);
       if (dnrProcessed) return;
 
       const countingProcessed = await handleCountingGame(message, client);
@@ -45,9 +48,42 @@ export default {
   }
 };
 
-async function handleDnrProtection(message) {
+async function handleReplyDnr(message, client) {
+  if (message.content.trim() !== '/dnr' || !message.reference?.messageId) return false;
+
   try {
-    const dnrerIds = getDnrerIdsForTarget(message.guild.id, message.author.id);
+    const referencedMessage = await message.channel.messages.fetch(message.reference.messageId).catch(() => null);
+    const targetUser = referencedMessage?.author;
+    if (!targetUser || targetUser.bot || targetUser.id === message.author.id) return false;
+
+    const targetMember = await message.guild.members.fetch(targetUser.id).catch(() => null);
+    if (!targetMember) return false;
+
+    if (targetUser.id === message.guild.ownerId || targetMember.permissions.has(PermissionFlagsBits.Administrator)) {
+      await message.delete().catch(() => {});
+      await message.channel.send({
+        embeds: [new EmbedBuilder().setDescription('❌ You cannot DNR this user\n\n**The server owner and users with Administrator permission cannot be DNRD.**')],
+      }).catch(() => {});
+      return true;
+    }
+
+    await addDnr(client, message.guild.id, message.author.id, targetUser.id);
+    await message.delete().catch(() => {});
+
+    await message.channel.send({
+      embeds: [new EmbedBuilder().setDescription(`# 📌 you DNRED ${targetMember.displayName}\n\n**They won't be able to ping/reply to you**`)],
+    }).catch(() => {});
+
+    return true;
+  } catch (error) {
+    logger.error('Error handling reply DNR:', error);
+    return false;
+  }
+}
+
+async function handleDnrProtection(message, client) {
+  try {
+    const dnrerIds = await getDnrerIdsForTarget(client, message.guild.id, message.author.id);
     if (dnrerIds.length === 0) return false;
 
     const mentionedDnrer = message.mentions.users.some((user) => dnrerIds.includes(user.id));
@@ -61,9 +97,12 @@ async function handleDnrProtection(message) {
 
     await message.delete().catch(() => {});
 
+    const dnrerId = dnrerIds.find((id) => mentionedDnrer && message.mentions.users.has(id)) || dnrerIds.find((id) => message.reference?.messageId);
+    const dnrerMember = dnrerId ? await message.guild.members.fetch(dnrerId).catch(() => null) : null;
+    const displayName = dnrerMember?.displayName || 'This user';
+
     const embed = new EmbedBuilder()
-      .setTitle('❗ This user DNRED you.')
-      .setDescription('**You can\'t ping or reply to them unless they undnr you**');
+      .setDescription(`# ❗ ${displayName} DNRD you.\n\n**You can't ping or reply to them unless they undnr you**`);
 
     await message.channel.send({ embeds: [embed] }).catch(() => {});
     return true;

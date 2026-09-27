@@ -25,10 +25,11 @@ async function resolveKlipyGifUrl(pageUrl) {
       },
     });
 
-    if (!response.ok) return null;
+    if (!response.ok) return [];
 
     const html = await response.text();
-    const candidates = new Set();
+    const candidates = [];
+    const seen = new Set();
 
     const normalize = (value) => String(value || '')
       .trim()
@@ -42,35 +43,44 @@ async function resolveKlipyGifUrl(pageUrl) {
     const add = (value) => {
       const normalized = normalize(value);
       const match = normalized.match(/https?:\/\/(?:static\d*|media|cdn)\.klipy\.com\/[^"'<>\s\\]+/i);
-      if (match) candidates.add(match[0]);
+      if (!match) return;
+      const url = match[0];
+      if (!seen.has(url)) {
+        seen.add(url);
+        candidates.push(url);
+      }
     };
 
+    // Only use media explicitly attached to THIS Klipy page.
+    // Do not scan every media URL on the page, because Klipy pages contain
+    // recommended/random GIFs too.
     const metaTags = html.match(/<meta\b[^>]*>/gi) || [];
     for (const tag of metaTags) {
-      const property = tag.match(/(?:property|name)\s*=\s*["']([^"']+)["']/i)?.[1]?.toLowerCase();
-      const content = tag.match(/content\s*=\s*["']([^"']+)["']/i)?.[1];
-      if (content && ['og:image', 'og:image:url', 'twitter:image'].includes(property)) add(content);
+      const attrs = {};
+      for (const match of tag.matchAll(/([:\w-]+)\s*=\s*["']([^"']*)["']/gi)) {
+        attrs[match[1].toLowerCase()] = match[2];
+      }
+
+      const key = (attrs.property || attrs.name || '').toLowerCase();
+      if (['og:image', 'og:image:url', 'twitter:image'].includes(key)) {
+        add(attrs.content);
+      }
     }
 
-    const structured = html.match(/"(?:contentUrl|content_url|gifUrl|gif_url|mediaUrl|media_url|imageUrl|image_url)"\s*:\s*"([^"]+)"/gi) || [];
+    // Prefer the actual content/media URL fields from structured page data.
+    const structured = html.match(
+      /"(?:contentUrl|content_url|gifUrl|gif_url|mediaUrl|media_url)"\s*:\s*"([^"]+)"/gi
+    ) || [];
     for (const entry of structured) {
       const value = entry.match(/:\s*"([^"]+)"/i)?.[1];
       if (value) add(value);
     }
 
-    const directMedia = html.match(/https?:\/\/(?:static\d*|media|cdn)\.klipy\.com\/[^"'<>\s\\]+/gi) || [];
-    for (const url of directMedia) add(url);
-
-    for (const url of candidates) {
-      if (/\.gif(?:[?#].*)?$/i.test(url)) return url;
-    }
-
-    return null;
+    return candidates;
   } catch {
-    return null;
+    return [];
   }
 }
-
 async function downloadGif(gifUrl) {
   if (!gifUrl) return null;
 
@@ -171,21 +181,31 @@ export default {
     const shuffledGifPages = [...(availableGifPages.length ? availableGifPages : DNR_GIFS)]
       .sort(() => Math.random() - 0.5);
 
-    let gifUrl = null;
+    let gifAttachment = null;
     let selectedGifPage = null;
+
+    // Try the user's exact 8 Klipy pages until one produces a real GIF.
+    // The "last used" page is excluded so the same GIF cannot repeat twice in a row.
     for (const gifPage of shuffledGifPages) {
-      const resolvedUrl = await resolveKlipyGifUrl(gifPage);
-      if (resolvedUrl) {
-        gifUrl = resolvedUrl;
-        selectedGifPage = gifPage;
-        break;
+      const candidates = await resolveKlipyGifUrl(gifPage);
+
+      for (const gifUrl of candidates) {
+        const attachment = await downloadGif(gifUrl);
+        if (attachment) {
+          gifAttachment = attachment;
+          selectedGifPage = gifPage;
+          break;
+        }
       }
+
+      if (gifAttachment) break;
     }
+
+    // Only mark a page as used after the GIF was successfully downloaded.
     if (selectedGifPage) {
       await setLastDnrGif(interaction.client, interaction.guild.id, selectedGifPage);
     }
 
-    const gifAttachment = await downloadGif(gifUrl);
     const embed = dnrEmbed(
       '# 📌 USER DNRD',
       `**${actorName} DNRED ${displayName}**\n\n**Reason:** ${reason}\n\n**They won't be able to ping/reply to you**`,

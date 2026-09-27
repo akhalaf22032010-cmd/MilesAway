@@ -25,8 +25,8 @@ async function resolveKlipyGifUrl(pageUrl) {
   }
 }
 
-function dnrEmbed(description, imageUrl = null) {
-  const embed = new EmbedBuilder().setDescription(description);
+function dnrEmbed(title, description, imageUrl = null) {
+  const embed = new EmbedBuilder().setTitle(title).setDescription(description);
   if (imageUrl) embed.setImage(imageUrl);
   return embed;
 }

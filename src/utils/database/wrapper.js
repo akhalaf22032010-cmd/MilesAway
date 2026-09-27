@@ -46,14 +46,19 @@ class DatabaseWrapper {
             }
         }
 
-        this.db = new MemoryStorage();
-        this.useFallback = true;
-        this.connectionType = 'memory';
+        // Never fall back to in-memory storage in production. A deploy/restart would
+        // destroy leveling XP and other persistent data. Fail startup instead so the
+        // bot cannot operate while persistence is unavailable.
+        this.db = null;
+        this.useFallback = false;
+        this.connectionType = 'none';
         this.degradedReason = 'POSTGRES_UNAVAILABLE';
-        logger.warn('⚠️ DATABASE DEGRADED MODE ENABLED - Using in-memory storage (data will be lost on restart)');
-        logger.warn('⚠️ Please check PostgreSQL connection and restart the bot when fixed');
-        this.initialized = true;
-        this.degradedModeWarningShown = true;
+
+        const error = new Error(
+            'Persistent PostgreSQL storage is unavailable. Bot startup aborted to prevent data loss.'
+        );
+        error.code = 'PERSISTENT_DATABASE_UNAVAILABLE';
+        throw error;
     }
 
     async set(key, value, ttl = null) {
@@ -148,7 +153,7 @@ export const db = new DatabaseWrapper();
 
 export async function initializeDatabase() {
     try {
-        logger.info('Initializing Database (PostgreSQL > Memory fallback)...');
+        logger.info('Initializing Database (PostgreSQL persistent storage required)...');
         await db.initialize();
         logger.info('✅ Database initialized');
         return { db };

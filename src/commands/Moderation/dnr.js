@@ -9,6 +9,7 @@ const DNR_GIFS = [
   'https://klipy.com/gifs/dnr-bojack',
   'https://klipy.com/gifs/dnr-didnt-read',
   'https://klipy.com/gifs/dnr-dnrd',
+  'https://klipy.com/gifs/loox-androgenicogre-2',
   'https://klipy.com/gifs/dnr-7'
 ];
 
@@ -25,8 +26,9 @@ async function resolveKlipyGifUrl(pageUrl) {
   }
 }
 
-function dnrEmbed(title, description, imageUrl = null) {
-  const embed = new EmbedBuilder().setTitle(title).setDescription(description);
+function dnrEmbed(title, description = null, imageUrl = null) {
+  const embed = new EmbedBuilder().setTitle(title);
+  if (description) embed.setDescription(description);
   if (imageUrl) embed.setImage(imageUrl);
   return embed;
 }
@@ -87,7 +89,7 @@ export default {
       });
     }
 
-    await addDnr(interaction.client, interaction.guild.id, interaction.user.id, target.id);
+    await addDnr(interaction.client, interaction.guild.id, interaction.user.id, target.id, reason);
     const actorName = interaction.member?.displayName || interaction.user.globalName || interaction.user.username;
     const displayName = targetMember?.displayName || target.displayName || target.username;
     const gifPage = DNR_GIFS[Math.floor(Math.random() * DNR_GIFS.length)];

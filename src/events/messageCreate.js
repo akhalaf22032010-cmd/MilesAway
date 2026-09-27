@@ -110,7 +110,7 @@ async function handleReplyDnr(message, client) {
 
     if (targetMember.permissions.has(PermissionFlagsBits.Administrator)) {
       await message.delete().catch(() => {});
-      await message.author.send({ embeds: [new EmbedBuilder().setDescription('❌ You cannot DNR this user\\n\\n**Users with Administrator permission cannot be DNRD.**')] }).catch(() => {});
+      await message.channel.send({ content: `<@${message.author.id}>`, embeds: [new EmbedBuilder().setDescription('❌ You cannot DNR this user\\n\\n**Users with Administrator permission cannot be DNRD.**')] }).catch(() => {});
       return true;
     }
 

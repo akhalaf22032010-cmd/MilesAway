@@ -10,16 +10,9 @@ export default {
   data: new SlashCommandBuilder()
     .setName('undnr')
     .setDescription('Remove a DNR from a user')
-    .addStringOption((option) =>
-      option
-        .setName('action')
-        .setDescription('Use all to clear your entire DNR list')
-        .setRequired(false)
-        .addChoices({ name: 'all', value: 'all' }),
-    )
-    .addUserOption((option) =>
-      option.setName('user').setDescription('The user to UNDNR').setRequired(false),
-    )
+    .setDefaultMemberPermissions(null)
+    .addStringOption((option) => option.setName('action').setDescription('Use all to clear your entire DNR list').setRequired(false).addChoices({ name: 'all', value: 'all' }))
+    .addUserOption((option) => option.setName('user').setDescription('The user to UNDNR').setRequired(false))
     .setDMPermission(false),
   category: 'moderation',
 
@@ -28,22 +21,18 @@ export default {
     const target = interaction.options.getUser('user');
 
     if (action === 'all') {
-      clearDnr(interaction.guild.id, interaction.user.id);
-      return InteractionHelper.safeReply(interaction, {
-        embeds: [dnrEmbed('🧹 You cleared your DNR list', '**Your dnr list is now 0 people**')],
-      });
+      await clearDnr(interaction.client, interaction.guild.id, interaction.user.id);
+      return InteractionHelper.safeReply(interaction, { embeds: [dnrEmbed('# 🧹 You cleared your DNR list', '**You now have 0 people DNRD**')] });
     }
 
     if (!target) {
-      return InteractionHelper.safeReply(interaction, {
-        embeds: [dnrEmbed('❌ Missing user', 'Use `/undnr @user` or `/undnr all`.')],
-      });
+      return InteractionHelper.safeReply(interaction, { embeds: [dnrEmbed('❌ Missing user', 'Use `/undnr @user` or `/undnr all`.')] });
     }
 
-    removeDnr(interaction.guild.id, interaction.user.id, target.id);
+    await removeDnr(interaction.client, interaction.guild.id, interaction.user.id, target.id);
+    const targetMember = await interaction.guild.members.fetch(target.id).catch(() => null);
+    const displayName = targetMember?.displayName || target.displayName || target.username;
 
-    return InteractionHelper.safeReply(interaction, {
-      embeds: [dnrEmbed(`↩️ You UNDNRED ${target.username}`, '**They can now ping/reply to you**')],
-    });
+    return InteractionHelper.safeReply(interaction, { embeds: [dnrEmbed(`# ↩️ You UNDNRD ${displayName}`, '**They can now ping/reply to you**')] });
   },
 };

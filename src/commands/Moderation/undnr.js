@@ -22,7 +22,7 @@ export default {
 
     if (action === 'all') {
       await clearDnr(interaction.client, interaction.guild.id, interaction.user.id);
-      return InteractionHelper.safeReply(interaction, { embeds: [dnrEmbed('# 🧹 You cleared your DNR list', '**You now have 0 people DNRD**')] });
+      return InteractionHelper.safeReply(interaction, { embeds: [dnrEmbed('', '# 🧹 You cleared your DNR list\n\n**You now have 0 people DNRD**')] });
     }
 
     if (!target) {

@@ -14,69 +14,43 @@ const DNR_GIFS = [
 ];
 
 async function resolveKlipyGifUrl(pageUrl) {
+  const apiKey = process.env.KLIPY_API_KEY;
+  if (!apiKey) return [];
+
   try {
-    const response = await fetch(pageUrl, {
-      redirect: 'follow',
+    const slug = new URL(pageUrl).pathname.split('/').filter(Boolean).pop();
+    if (!slug) return [];
+
+    const apiUrl = new URL('https://api.klipy.com/api/v1/' + encodeURIComponent(apiKey) + '/gifs/items');
+    apiUrl.searchParams.set('slugs', slug);
+
+    const response = await fetch(apiUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/136 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Referer': 'https://klipy.com/',
+        'Accept': 'application/json',
+        'User-Agent': 'MilesAway Discord Bot',
       },
     });
 
     if (!response.ok) return [];
 
-    const html = await response.text();
-    const candidates = [];
-    const seen = new Set();
+    const body = await response.json();
+    const items = body?.data?.data || body?.data || [];
+    const item = Array.isArray(items) ? items[0] : null;
+    if (!item) return [];
 
-    const normalize = (value) => String(value || '')
-      .trim()
-      .replace(/\\u002F/gi, '/')
-      .replace(/\\u0026/gi, '&')
-      .replace(/\\\//g, '/')
-      .replace(/&amp;/g, '&')
-      .replace(/%2F/gi, '/')
-      .replace(/%3A/gi, ':');
-
+    const urls = [];
     const add = (value) => {
-      const normalized = normalize(value);
-      const match = normalized.match(/https?:\/\/(?:static\d*|media|cdn)\.klipy\.com\/[^"'<>\s\\]+/i);
-      if (!match) return;
-      const url = match[0];
-      if (!seen.has(url)) {
-        seen.add(url);
-        candidates.push(url);
-      }
+      if (typeof value !== 'string') return;
+      if (/^https:\/\/(?:static\\d*|media|cdn)\\.klipy\\.com\\//i.test(value)) urls.push(value);
     };
 
-    // Only use media explicitly attached to THIS Klipy page.
-    // Do not scan every media URL on the page, because Klipy pages contain
-    // recommended/random GIFs too.
-    const metaTags = html.match(/<meta\b[^>]*>/gi) || [];
-    for (const tag of metaTags) {
-      const attrs = {};
-      for (const match of tag.matchAll(/([:\w-]+)\s*=\s*["']([^"']*)["']/gi)) {
-        attrs[match[1].toLowerCase()] = match[2];
-      }
+    add(item?.file?.hd?.gif?.url);
+    add(item?.file?.md?.gif?.url);
+    add(item?.file?.sm?.gif?.url);
+    add(item?.file?.xs?.gif?.url);
+    add(item?.media_formats?.gif?.url);
 
-      const key = (attrs.property || attrs.name || '').toLowerCase();
-      if (['og:image', 'og:image:url', 'twitter:image'].includes(key)) {
-        add(attrs.content);
-      }
-    }
-
-    // Prefer the actual content/media URL fields from structured page data.
-    const structured = html.match(
-      /"(?:contentUrl|content_url|gifUrl|gif_url|mediaUrl|media_url)"\s*:\s*"([^"]+)"/gi
-    ) || [];
-    for (const entry of structured) {
-      const value = entry.match(/:\s*"([^"]+)"/i)?.[1];
-      if (value) add(value);
-    }
-
-    return candidates;
+    return [...new Set(urls)];
   } catch {
     return [];
   }

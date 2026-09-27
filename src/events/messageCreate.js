@@ -12,7 +12,7 @@ import { getCommandPrefix, getBotMessage, isBotOwner, isCommandCategoryEnabled, 
 import { enforceAbuseProtection, formatCooldownDuration } from '../utils/abuseProtection.js';
 import { createEmbed } from '../utils/embeds.js';
 import { isCommandEnabled } from '../services/commandAccessService.js';
-import { addDnr, getDnrerIdsForTarget } from '../services/moderation/dnrService.js';
+import { addDnr, getDnrerIdsForTarget, getDnrReason } from '../services/moderation/dnrService.js';
 import {
   getCountingGameConfig,
   saveCountingGameConfig,
@@ -74,7 +74,7 @@ export default {
 async function handleReplyDnr(message, client) {
   if (!message.reference?.messageId) return false;
   const raw = message.content.trim();
-  if (!raw.toLowerCase().startsWith('/dnr')) return false;
+  if (!/^\/dnr(?:\s|$)/i.test(raw)) return false;
   const reason = raw.slice(4).trim();
   if (!reason) {
     await message.author.send({ embeds: [new EmbedBuilder().setDescription('# ❌ Missing reason\n\n**You must provide a reason when using `/dnr` as a reply.**')] }).catch(() => {});
@@ -101,13 +101,14 @@ async function handleReplyDnr(message, client) {
       return true;
     }
 
-    await addDnr(client, message.guild.id, message.author.id, targetUser.id);
+    await addDnr(client, message.guild.id, message.author.id, targetUser.id, reason);
     await message.delete().catch(() => {});
 
     const gifPage = DNR_GIFS[Math.floor(Math.random() * DNR_GIFS.length)];
     const gifUrl = await resolveKlipyGifUrl(gifPage);
     const confirmationEmbed = new EmbedBuilder()
-      .setDescription(`# 📌 ${message.member?.displayName || message.author.globalName || message.author.username} DNRED ${targetMember.displayName}\n\n**They won't be able to ping/reply to you**\n\n**Reason:** ${reason}`);
+      .setTitle('# 📌 USER DNRD')
+      .setDescription(`**${message.member?.displayName || message.author.globalName || message.author.username} DNRED ${targetMember.displayName}**\n\n**Reason:** ${reason}\n\n**They won't be able to ping/reply to you**`);
     if (gifUrl) confirmationEmbed.setImage(gifUrl);
 
     await message.channel.send({
@@ -144,8 +145,10 @@ async function handleDnrProtection(message, client) {
     const dnrerMember = dnrerId ? await message.guild.members.fetch(dnrerId).catch(() => null) : null;
     const displayName = dnrerMember?.displayName || 'This user';
 
+    const dnrerReason = await getDnrReason(client, message.guild.id, dnrerId, message.author.id);
     const embed = new EmbedBuilder()
-      .setDescription(`# ❗ ${displayName} DNRD you.\n\n**You can't ping or reply to them unless they undnr you**`);
+      .setTitle('# ❗ DNRD')
+      .setDescription(`# ❗ ${displayName} DNRD you.\n\n**Reason:** ${dnrerReason}\n\n**You can't ping or reply to them unless they undnr you**`);
 
     await message.author.send({ embeds: [embed] }).catch(() => {});
     return true;

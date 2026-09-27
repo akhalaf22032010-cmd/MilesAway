@@ -104,7 +104,7 @@ async function handleReplyDnr(message, client) {
     const gifPage = DNR_GIFS[Math.floor(Math.random() * DNR_GIFS.length)];
     const gifUrl = await resolveKlipyGifUrl(gifPage);
     const confirmationEmbed = new EmbedBuilder()
-      .setDescription(`# 📌 you DNRED ${targetMember.displayName}\n\n**They won't be able to ping/reply to you**`);
+      .setDescription(`# 📌 ${message.member?.displayName || message.author.globalName || message.author.username} DNRED ${targetMember.displayName}\n\n**They won't be able to ping/reply to you**\n\n**Reason:** ${reason}`);
     if (gifUrl) confirmationEmbed.setImage(gifUrl);
 
     await message.channel.send({

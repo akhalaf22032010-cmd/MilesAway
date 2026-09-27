@@ -2,8 +2,8 @@ import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { clearDnr, removeDnr } from '../../services/moderation/dnrService.js';
 
-function dnrEmbed(title, description) {
-  return new EmbedBuilder().setTitle(title).setDescription(description);
+function dnrEmbed(description) {
+  return new EmbedBuilder().setDescription(description);
 }
 
 export default {
@@ -22,17 +22,17 @@ export default {
 
     if (action === 'all') {
       await clearDnr(interaction.client, interaction.guild.id, interaction.user.id);
-      return InteractionHelper.safeReply(interaction, { embeds: [dnrEmbed('', '# 🧹 You cleared your DNR list\n\n**You now have 0 people DNRD**')] });
+      return InteractionHelper.safeReply(interaction, { embeds: [dnrEmbed('# 🧹 You cleared your DNR list\n\n**You now have 0 people DNRD**')] });
     }
 
     if (!target) {
-      return InteractionHelper.safeReply(interaction, { embeds: [dnrEmbed('❌ Missing user', 'Use `/undnr @user` or `/undnr all`.')] });
+      return InteractionHelper.safeReply(interaction, { embeds: [dnrEmbed('❌ Missing user\n\nUse `/undnr @user` or `/undnr all`.')] });
     }
 
     await removeDnr(interaction.client, interaction.guild.id, interaction.user.id, target.id);
     const targetMember = await interaction.guild.members.fetch(target.id).catch(() => null);
     const displayName = targetMember?.displayName || target.displayName || target.username;
 
-    return InteractionHelper.safeReply(interaction, { embeds: [dnrEmbed(`# ↩️ You UNDNRD ${displayName}`, '**They can now ping/reply to you**')] });
+    return InteractionHelper.safeReply(interaction, { embeds: [dnrEmbed(`# ↩️ ${interaction.member?.displayName || interaction.user.globalName || interaction.user.username} UNDNRD ${displayName}\n\n**They can now ping/reply to you**`)] });
   },
 };

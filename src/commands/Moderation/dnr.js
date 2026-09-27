@@ -41,14 +41,15 @@ async function resolveKlipyGifUrl(pageUrl) {
     const urls = [];
     const add = (value) => {
       if (typeof value !== 'string') return;
-      if (/^https:\/\/(?:static\\d*|media|cdn)\\.klipy\\.com\\//i.test(value)) urls.push(value);
+      if (/^https:\/\/(?:static\d*|media|cdn)\.klipy\.com\//i.test(value)) urls.push(value);
     };
 
     add(item?.file?.hd?.gif?.url);
     add(item?.file?.md?.gif?.url);
     add(item?.file?.sm?.gif?.url);
     add(item?.file?.xs?.gif?.url);
-    add(item?.media_formats?.gif?.url);\n    add(item?.media?.gif?.url);
+    add(item?.media_formats?.gif?.url);
+    add(item?.media?.gif?.url);
 
     return [...new Set(urls)];
   } catch {

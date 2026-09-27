@@ -44,10 +44,17 @@ async function resolveKlipyGifUrl(pageUrl) {
       } catch {}
     };
 
-    const mediaPattern = /https?:\/\/(?:static\d*|media|cdn)\.klipy\.com\/[^"'<>\s\\]+/gi;
-    for (const match of html.matchAll(mediaPattern)) addCandidate(match[0]);
+    // KLIPY pages may contain escaped direct media URLs.
+    const normalizedHtml = html
+      .replace(/\\\//g, '/')
+      .replace(/\\u002F/gi, '/')
+      .replace(/\\u0026/gi, '&');
 
-    const metaTags = html.match(/<meta\b[^>]*>/gi) || [];
+    const mediaPattern = /https?:\/\/(?:static\d*|media|cdn)\.klipy\.com\/[^"'<>\s\\]+/gi;
+    for (const match of normalizedHtml.matchAll(mediaPattern)) addCandidate(match[0]);
+
+    // Handle OG/Twitter tags regardless of attribute order.
+    const metaTags = normalizedHtml.match(/<meta\b[^>]*>/gi) || [];
     for (const tag of metaTags) {
       const property = tag.match(/(?:property|name)\s*=\s*["']([^"']+)["']/i)?.[1]?.toLowerCase();
       const content = tag.match(/content\s*=\s*["']([^"']+)["']/i)?.[1];

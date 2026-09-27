@@ -96,7 +96,7 @@ export default {
     const gifUrl = await resolveKlipyGifUrl(gifPage);
 
     return InteractionHelper.safeReply(interaction, {
-      embeds: [await dnrEmbed(`# 📌 you DNRED ${displayName}`, '**They won\'t be able to ping/reply to you**', gifUrl)],
+      embeds: [dnrEmbed('# 📌 USER DNRD', `**${actorName} DNRED ${displayName}**\n\n**Reason:** ${reason}\n\n**They won't be able to ping/reply to you**`, gifUrl)],
     });
   },
 };

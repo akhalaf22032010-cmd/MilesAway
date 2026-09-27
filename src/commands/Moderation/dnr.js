@@ -58,6 +58,10 @@ export default {
       return InteractionHelper.safeReply(interaction, { embeds: [dnrEmbed('❌ Missing user', 'Use `/dnr @user` to DNR someone, or `/dnr list` to view your list.')], flags: MessageFlags.Ephemeral });
     }
 
+    if (!reason?.trim()) {
+      return InteractionHelper.safeReply(interaction, { embeds: [dnrEmbed('❌ Missing reason', 'You must provide a reason when DNRing someone.')], flags: MessageFlags.Ephemeral });
+    }
+
     if (target.id === interaction.user.id) {
       return InteractionHelper.safeReply(interaction, { embeds: [dnrEmbed('❌ You cannot DNR yourself', 'Choose another user.')], flags: MessageFlags.Ephemeral });
     }

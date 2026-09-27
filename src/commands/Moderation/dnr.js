@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, MessageFlags, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, MessageFlags, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { addDnr, getDnrList } from '../../services/moderation/dnrService.js';
 
@@ -10,16 +10,9 @@ export default {
   data: new SlashCommandBuilder()
     .setName('dnr')
     .setDescription('DNR a user or view your DNR list')
-    .addStringOption((option) =>
-      option
-        .setName('action')
-        .setDescription('Use list to view your DNR list')
-        .setRequired(false)
-        .addChoices({ name: 'list', value: 'list' }),
-    )
-    .addUserOption((option) =>
-      option.setName('user').setDescription('The user to DNR').setRequired(false),
-    )
+    .setDefaultMemberPermissions(null)
+    .addStringOption((option) => option.setName('action').setDescription('Use list to view your DNR list').setRequired(false).addChoices({ name: 'list', value: 'list' }))
+    .addUserOption((option) => option.setName('user').setDescription('The user to DNR').setRequired(false))
     .setDMPermission(false),
   category: 'moderation',
 
@@ -28,46 +21,39 @@ export default {
     const target = interaction.options.getUser('user');
 
     if (action === 'list') {
-      const ids = getDnrList(interaction.guild.id, interaction.user.id);
+      const ids = await getDnrList(interaction.client, interaction.guild.id, interaction.user.id);
       if (ids.length === 0) {
-        return InteractionHelper.safeReply(interaction, {
-          embeds: [dnrEmbed('📋 Your DNR List', '**Your DNR list is empty.**')],
-          flags: MessageFlags.Ephemeral,
-        });
+        return InteractionHelper.safeReply(interaction, { embeds: [dnrEmbed('📋 Your DNR List', '**Your DNR list is empty.**')], flags: MessageFlags.Ephemeral });
       }
-
       const mentions = ids.map((id, index) => `${index + 1}. <@${id}>`).join('\n');
-      return InteractionHelper.safeReply(interaction, {
-        embeds: [dnrEmbed('📋 Your DNR List', mentions)],
-        flags: MessageFlags.Ephemeral,
-      });
+      return InteractionHelper.safeReply(interaction, { embeds: [dnrEmbed('📋 Your DNR List', mentions)], flags: MessageFlags.Ephemeral });
     }
 
     if (!target) {
-      return InteractionHelper.safeReply(interaction, {
-        embeds: [dnrEmbed('❌ Missing user', 'Use `/dnr @user` to DNR someone, or `/dnr list` to view your list.')],
-        flags: MessageFlags.Ephemeral,
-      });
+      return InteractionHelper.safeReply(interaction, { embeds: [dnrEmbed('❌ Missing user', 'Use `/dnr @user` to DNR someone, or `/dnr list` to view your list.')], flags: MessageFlags.Ephemeral });
     }
 
     if (target.id === interaction.user.id) {
-      return InteractionHelper.safeReply(interaction, {
-        embeds: [dnrEmbed('❌ You cannot DNR yourself', 'Choose another user.')],
-        flags: MessageFlags.Ephemeral,
-      });
+      return InteractionHelper.safeReply(interaction, { embeds: [dnrEmbed('❌ You cannot DNR yourself', 'Choose another user.')], flags: MessageFlags.Ephemeral });
     }
 
     if (target.bot) {
+      return InteractionHelper.safeReply(interaction, { embeds: [dnrEmbed('❌ You cannot DNR a bot', 'Choose a server member instead.')], flags: MessageFlags.Ephemeral });
+    }
+
+    const targetMember = await interaction.guild.members.fetch(target.id).catch(() => null);
+    if (target.id === interaction.guild.ownerId || targetMember?.permissions.has(PermissionFlagsBits.Administrator)) {
       return InteractionHelper.safeReply(interaction, {
-        embeds: [dnrEmbed('❌ You cannot DNR a bot', 'Choose a server member instead.')],
+        embeds: [dnrEmbed('❌ You cannot DNR this user', 'The server owner and users with Administrator permission cannot be DNRD.')],
         flags: MessageFlags.Ephemeral,
       });
     }
 
-    addDnr(interaction.guild.id, interaction.user.id, target.id);
+    await addDnr(interaction.client, interaction.guild.id, interaction.user.id, target.id);
+    const displayName = targetMember?.displayName || target.displayName || target.username;
 
     return InteractionHelper.safeReply(interaction, {
-      embeds: [dnrEmbed(`📌 You DNRED ${target.username}`, '**Undnr them for them to ping/reply to you**')],
+      embeds: [dnrEmbed(`# 📌 you DNRED ${displayName}`, '**They won\'t be able to ping/reply to you**')],
     });
   },
 };

@@ -34,7 +34,7 @@ async function resolveKlipyGifUrl(pageUrl) {
     if (!response.ok) return [];
 
     const body = await response.json();
-    const items = body?.data?.data || body?.data || [];
+    const items = body?.data?.data || body?.data?.items || body?.data || [];
     const item = Array.isArray(items) ? items[0] : null;
     if (!item) return [];
 
@@ -48,7 +48,7 @@ async function resolveKlipyGifUrl(pageUrl) {
     add(item?.file?.md?.gif?.url);
     add(item?.file?.sm?.gif?.url);
     add(item?.file?.xs?.gif?.url);
-    add(item?.media_formats?.gif?.url);
+    add(item?.media_formats?.gif?.url);\n    add(item?.media?.gif?.url);
 
     return [...new Set(urls)];
   } catch {

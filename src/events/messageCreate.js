@@ -104,7 +104,7 @@ async function handleReplyDnr(message, client) {
 
     if (targetUser.id === message.guild.ownerId) {
       await message.delete().catch(() => {});
-      await message.author.send({ embeds: [new EmbedBuilder().setDescription('You cannot DNR the Owner!')] }).catch(() => {});
+      await message.channel.send({ content: `<@${message.author.id}>`, embeds: [new EmbedBuilder().setDescription('You cannot DNR the Owner!')] }).catch(() => {});
       return true;
     }
 
@@ -167,7 +167,7 @@ async function handleDnrProtection(message, client) {
       .setTitle('# ❗ DNRD')
       .setDescription(`# ❗ ${displayName} DNRD you.\n\n**Reason:** ${dnrerReason}\n\n**You can't ping or reply to them unless they undnr you**`);
 
-    await message.author.send({ embeds: [embed] }).catch(() => {});
+    await message.channel.send({ content: `<@${message.author.id}>`, embeds: [embed] }).catch(() => {});
     return true;
   } catch (error) {
     logger.error('Error handling DNR protection:', error);

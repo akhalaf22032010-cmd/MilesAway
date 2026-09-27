@@ -1,5 +1,4 @@
 import { pgDb } from '../postgresDatabase.js';
-import { MemoryStorage } from '../memoryStorage.js';
 import { logger } from '../logger.js';
 import { validateGuildConfigOrThrow } from '../schemas.js';
 
@@ -160,11 +159,11 @@ export async function initializeDatabase() {
     } catch (error) {
         logger.error('❌ Database Initialization Error:', error);
 
-        if (error.code === 'SCHEMA_VERSION_MISMATCH') {
+        if (error.code === 'SCHEMA_VERSION_MISMATCH' || error.code === 'PERSISTENT_DATABASE_UNAVAILABLE') {
             throw error;
         }
 
-        return { db };
+        throw error;
     }
 }
 

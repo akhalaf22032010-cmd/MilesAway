@@ -22,6 +22,15 @@ import {
 
 const MESSAGE_XP_RATE_LIMIT_ATTEMPTS = 12;
 const MESSAGE_XP_RATE_LIMIT_WINDOW_MS = 10000;
+const DNR_GIFS = [
+  'https://klipy.com/gifs/jon-erik-hexum-dnr',
+  'https://klipy.com/gifs/dnr',
+  'https://klipy.com/gifs/dnr-2',
+  'https://klipy.com/gifs/dnr-bojack',
+  'https://klipy.com/gifs/dnr-didnt-read',
+  'https://klipy.com/gifs/dnr-dnrd',
+  'https://klipy.com/gifs/dnr-7'
+];
 
 export default {
   name: Events.MessageCreate,
@@ -107,7 +116,7 @@ async function handleDnrProtection(message, client) {
     const embed = new EmbedBuilder()
       .setDescription(`# ❗ ${displayName} DNRD you.\n\n**You can't ping or reply to them unless they undnr you**`);
 
-    await message.channel.send({ embeds: [embed] }).catch(() => {});
+    await message.author.send({ embeds: [embed] }).catch(() => {});
     return true;
   } catch (error) {
     logger.error('Error handling DNR protection:', error);

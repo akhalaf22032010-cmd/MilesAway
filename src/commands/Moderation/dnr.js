@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, MessageFlags, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
+import { SlashCommandBuilder, MessageFlags, EmbedBuilder, PermissionFlagsBits, AttachmentBuilder } from 'discord.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { addDnr, getDnrList, getLastDnrGif, setLastDnrGif } from '../../services/moderation/dnrService.js';
 
@@ -66,6 +66,39 @@ async function resolveKlipyGifUrl(pageUrl) {
     }
 
     return null;
+  } catch {
+    return null;
+  }
+}
+
+async function downloadGif(gifUrl) {
+  if (!gifUrl) return null;
+
+  try {
+    const response = await fetch(gifUrl, {
+      redirect: 'follow',
+      headers: {
+        'User-Agent': 'Mozilla/5.0',
+        'Accept': 'image/gif,image/*;q=0.8,*/*;q=0.5',
+        'Referer': 'https://klipy.com/',
+      },
+    });
+
+    if (!response.ok) return null;
+
+    const contentType = response.headers.get('content-type') || '';
+    const contentLength = Number(response.headers.get('content-length') || 0);
+
+    if (!contentType.toLowerCase().includes('gif') && !/\.gif(?:[?#].*)?$/i.test(gifUrl)) {
+      return null;
+    }
+
+    if (contentLength > 8 * 1024 * 1024) return null;
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (!buffer.length || buffer.length > 8 * 1024 * 1024) return null;
+
+    return new AttachmentBuilder(buffer, { name: 'dnr.gif' });
   } catch {
     return null;
   }
@@ -152,8 +185,16 @@ export default {
       await setLastDnrGif(interaction.client, interaction.guild.id, selectedGifPage);
     }
 
+    const gifAttachment = await downloadGif(gifUrl);
+    const embed = dnrEmbed(
+      '# 📌 USER DNRD',
+      `**${actorName} DNRED ${displayName}**\n\n**Reason:** ${reason}\n\n**They won't be able to ping/reply to you**`,
+      gifAttachment ? 'attachment://dnr.gif' : null,
+    );
+
     return InteractionHelper.safeReply(interaction, {
-      embeds: [dnrEmbed('# 📌 USER DNRD', `**${actorName} DNRED ${displayName}**\n\n**Reason:** ${reason}\n\n**They won't be able to ping/reply to you**`, gifUrl)],
+      embeds: [embed],
+      ...(gifAttachment ? { files: [gifAttachment] } : {}),
     });
   },
 };

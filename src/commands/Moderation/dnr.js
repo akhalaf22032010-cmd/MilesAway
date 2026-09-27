@@ -1,6 +1,6 @@
 import { SlashCommandBuilder, MessageFlags, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
-import { addDnr, getDnrList } from '../../services/moderation/dnrService.js';
+import { addDnr, getDnrList, getLastDnrGif, setLastDnrGif } from '../../services/moderation/dnrService.js';
 
 const DNR_GIFS = [
   'https://klipy.com/gifs/jon-erik-hexum-dnr',
@@ -151,11 +151,23 @@ export default {
     await addDnr(interaction.client, interaction.guild.id, interaction.user.id, target.id, reason);
     const actorName = interaction.member?.displayName || interaction.user.globalName || interaction.user.username;
     const displayName = targetMember?.displayName || target.displayName || target.username;
-    const shuffledGifPages = [...DNR_GIFS].sort(() => Math.random() - 0.5);
+    const lastGifPage = await getLastDnrGif(interaction.client, interaction.guild.id);
+    const availableGifPages = DNR_GIFS.filter((page) => page !== lastGifPage);
+    const shuffledGifPages = [...(availableGifPages.length ? availableGifPages : DNR_GIFS)]
+      .sort(() => Math.random() - 0.5);
+
     let gifUrl = null;
+    let selectedGifPage = null;
     for (const gifPage of shuffledGifPages) {
-      gifUrl = await resolveKlipyGifUrl(gifPage);
-      if (gifUrl) break;
+      const resolvedUrl = await resolveKlipyGifUrl(gifPage);
+      if (resolvedUrl) {
+        gifUrl = resolvedUrl;
+        selectedGifPage = gifPage;
+        break;
+      }
+    }
+    if (selectedGifPage) {
+      await setLastDnrGif(interaction.client, interaction.guild.id, selectedGifPage);
     }
 
     return InteractionHelper.safeReply(interaction, {

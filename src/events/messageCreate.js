@@ -75,11 +75,7 @@ async function handleReplyDnr(message, client) {
   if (!message.reference?.messageId) return false;
   const raw = message.content.trim();
   if (!/^\/dnr(?:\s|$)/i.test(raw)) return false;
-  const reason = raw.slice(4).trim();
-  if (!reason) {
-    await message.author.send({ embeds: [new EmbedBuilder().setDescription('# ❌ Missing reason\n\n**You must provide a reason when using `/dnr` as a reply.**')] }).catch(() => {});
-    return true;
-  }
+  const reason = raw.slice(4).trim() || 'No reason provided.';
 
   try {
     const referencedMessage = await message.channel.messages.fetch(message.reference.messageId).catch(() => null);

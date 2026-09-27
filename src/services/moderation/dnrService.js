@@ -92,3 +92,13 @@ export async function getDnrerIdsForTarget(client, guildId, targetId) {
   }
   return dnrerIds;
 }
+
+export async function getLastDnrGif(client, guildId) {
+  try { return await client.db.get('guild:' + guildId + ':dnr:lastGif', null); }
+  catch (error) { logger.error('Error loading last DNR GIF for guild ' + guildId + ':', error); return null; }
+}
+
+export async function setLastDnrGif(client, guildId, gifPage) {
+  try { await client.db.set('guild:' + guildId + ':dnr:lastGif', gifPage); }
+  catch (error) { logger.error('Error saving last DNR GIF for guild ' + guildId + ':', error); }
+}

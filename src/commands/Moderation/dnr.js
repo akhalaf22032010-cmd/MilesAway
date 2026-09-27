@@ -37,6 +37,7 @@ export default {
     .setDescription('DNR a user or view your DNR list')
     .setDefaultMemberPermissions(null)
     .addStringOption((option) => option.setName('action').setDescription('Use list to view your DNR list').setRequired(false).addChoices({ name: 'list', value: 'list' }))
+    .addStringOption((option) => option.setName('reason').setDescription('Why you are DNRing this user').setRequired(false))
     .addUserOption((option) => option.setName('user').setDescription('The user to DNR').setRequired(false))
     .setDMPermission(false),
   category: 'moderation',
@@ -44,6 +45,7 @@ export default {
   async execute(interaction) {
     const action = interaction.options.getString('action');
     const target = interaction.options.getUser('user');
+    const reason = interaction.options.getString('reason');
 
     if (action === 'list') {
       const ids = await getDnrList(interaction.client, interaction.guild.id, interaction.user.id);

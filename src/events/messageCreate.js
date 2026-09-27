@@ -97,7 +97,10 @@ async function handleDnrProtection(message, client) {
 
     await message.delete().catch(() => {});
 
-    const dnrerId = dnrerIds.find((id) => mentionedDnrer && message.mentions.users.has(id)) || dnrerIds.find((id) => message.reference?.messageId);
+    const referencedDnrerId = message.reference?.messageId
+      ? await message.channel.messages.fetch(message.reference.messageId).then((referencedMessage) => referencedMessage.author.id).catch(() => null)
+      : null;
+    const dnrerId = dnrerIds.find((id) => mentionedDnrer && message.mentions.users.has(id)) || referencedDnrerId;
     const dnrerMember = dnrerId ? await message.guild.members.fetch(dnrerId).catch(() => null) : null;
     const displayName = dnrerMember?.displayName || 'This user';
 

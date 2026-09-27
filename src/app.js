@@ -17,6 +17,7 @@ import { initializeMusic } from './services/music/riffySetup.js';
 import { shutdownMusic } from './services/music/playerHandler.js';
 import pkg from '../package.json' with { type: 'json' };
 import { EXPECTED_SCHEMA_VERSION, EXPECTED_SCHEMA_LABEL } from './config/database/schemaVersion.js';
+import dnrCommand from './commands/Moderation/dnr.js';
 
 class TitanBot extends Client {
   constructor() {
@@ -324,9 +325,23 @@ class TitanBot extends Client {
 
   async registerCommands() {
     try {
+      // Safety net: ensure /dnr is always present in the command collection
+      // even if a command-loader import is skipped or fails silently.
+      if (!this.commands.has('dnr')) {
+        this.commands.set('dnr', dnrCommand);
+        startupLog('⚠️ /dnr was missing from the loaded command collection; restored it before registration.');
+      }
+
+      startupLog(`Preparing slash-command registration: ${this.commands.size} commands loaded.`);
+      if (!this.commands.has('dnr')) {
+        throw new Error('/dnr is not available for registration');
+      }
+
       await registerSlashCommands(this, { clientId: this.config.bot.clientId });
+      startupLog('✅ Slash-command registration finished; /dnr was included in the command collection.');
     } catch (error) {
       logger.error('Error registering commands:', error);
+      startupLog(`❌ Slash-command registration failed: ${error?.message || error}`);
     }
   }
 

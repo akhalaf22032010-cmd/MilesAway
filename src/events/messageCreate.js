@@ -277,8 +277,13 @@ async function handleLeveling(message, client) {
     const canProcess = await checkRateLimit(rateLimitKey, MESSAGE_XP_RATE_LIMIT_ATTEMPTS, MESSAGE_XP_RATE_LIMIT_WINDOW_MS);
     if (!canProcess) return;
 
+    if (!client.db || (typeof client.db.isAvailable === 'function' && !client.db.isAvailable())) {
+      logger.warn(`Leveling skipped because the database is unavailable in guild ${message.guild.id}`);
+      return;
+    }
+
     const levelingConfig = await getLevelingConfig(client, message.guild.id);
-    if (!levelingConfig?.enabled) return;
+    if (!levelingConfig || levelingConfig.enabled === false) return;
     if (levelingConfig.ignoredChannels?.includes(message.channel.id)) return;
 
     if (levelingConfig.ignoredRoles?.length > 0) {
@@ -290,13 +295,18 @@ async function handleLeveling(message, client) {
     if (!message.content || message.content.trim().length === 0) return;
 
     const userData = await getUserLevelData(client, message.guild.id, message.author.id);
-    const cooldownTime = levelingConfig.xpCooldown || 60;
+    const cooldownTime = Number.isFinite(Number(levelingConfig.xpCooldown))
+      ? Math.max(0, Number(levelingConfig.xpCooldown))
+      : 60;
     const now = Date.now();
-    const timeSinceLastMessage = now - (userData.lastMessage || 0);
+    const lastMessage = Number(userData.lastMessage) || 0;
+    const timeSinceLastMessage = now - lastMessage;
     if (timeSinceLastMessage < cooldownTime * 1000) return;
 
-    const minXP = levelingConfig.xpRange?.min || levelingConfig.xpPerMessage?.min || 15;
-    const maxXP = levelingConfig.xpRange?.max || levelingConfig.xpPerMessage?.max || 25;
+    const configuredMinXP = Number(levelingConfig.xpRange?.min ?? levelingConfig.xpPerMessage?.min ?? 15);
+    const configuredMaxXP = Number(levelingConfig.xpRange?.max ?? levelingConfig.xpPerMessage?.max ?? 25);
+    const minXP = Number.isFinite(configuredMinXP) ? Math.max(1, configuredMinXP) : 15;
+    const maxXP = Number.isFinite(configuredMaxXP) ? Math.max(minXP, configuredMaxXP) : Math.max(minXP, 25);
     const safeMinXP = Math.max(1, minXP);
     const safeMaxXP = Math.max(safeMinXP, maxXP);
     const xpToGive = Math.floor(Math.random() * (safeMaxXP - safeMinXP + 1)) + safeMinXP;

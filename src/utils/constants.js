@@ -38,6 +38,20 @@ export const DEFAULT_GUILD_CONFIG = {
     },
     verification: {
         enabled: false
+    },
+    leveling: {
+        enabled: true,
+        xpRange: { min: 15, max: 25 },
+        xpPerMessage: { min: 15, max: 25 },
+        xpCooldown: 20,
+        levelUpMessage: '{user} has leveled up to level {level}!',
+        levelUpChannel: null,
+        ignoredChannels: [],
+        ignoredRoles: [],
+        blacklistedUsers: [],
+        roleRewards: {},
+        announceLevelUp: true,
+        xpMultiplier: 1
     }
 };
 

@@ -2,7 +2,6 @@ import { Events, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
 import { logger } from '../utils/logger.js';
 import { getLevelingConfig, getUserLevelData } from '../services/leveling/leveling.js';
 import { addXp } from '../services/leveling/xpSystem.js';
-import { checkRateLimit } from '../utils/rateLimiter.js';
 import { parsePrefixCommand } from '../utils/prefixParser.js';
 import { supportsPrefixExecution, executePrefixCommand, resolvePrefixAccessKey } from '../utils/messageAdapter.js';
 import { resolveCommandAlias, resolveSubcommandAlias } from '../config/commands/commandAliases.js';
@@ -20,8 +19,6 @@ import {
   recordCorrectCount,
 } from '../services/countingGameService.js';
 
-const MESSAGE_XP_RATE_LIMIT_ATTEMPTS = 12;
-const MESSAGE_XP_RATE_LIMIT_WINDOW_MS = 10000;
 const DNR_GIFS = [
   'https://klipy.com/gifs/jon-erik-hexum-dnr',
   'https://klipy.com/gifs/dnr',
@@ -273,10 +270,6 @@ async function handleCountingGame(message, client) {
 
 async function handleLeveling(message, client) {
   try {
-    const rateLimitKey = `xp-event:${message.guild.id}:${message.author.id}`;
-    const canProcess = await checkRateLimit(rateLimitKey, MESSAGE_XP_RATE_LIMIT_ATTEMPTS, MESSAGE_XP_RATE_LIMIT_WINDOW_MS);
-    if (!canProcess) return;
-
     if (!client.db || (typeof client.db.isAvailable === 'function' && !client.db.isAvailable())) {
       logger.warn(`Leveling skipped because the database is unavailable in guild ${message.guild.id}`);
       return;

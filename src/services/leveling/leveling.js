@@ -147,36 +147,53 @@ export function createLeaderboardEmbed(leaderboard, guild) {
   return embed;
 }
 
+export const DEFAULT_LEVELING_CONFIG = Object.freeze({
+  enabled: true,
+  configured: false,
+  xpRange: Object.freeze({ min: 15, max: 25 }),
+  xpPerMessage: Object.freeze({ min: 15, max: 25 }),
+  xpCooldown: 20,
+  levelUpMessage: '{user} has leveled up to level {level}!',
+  levelUpChannel: null,
+  ignoredChannels: [],
+  ignoredRoles: [],
+  blacklistedUsers: [],
+  roleRewards: {},
+  announceLevelUp: true,
+  xpMultiplier: 1,
+});
+
 export async function getLevelingConfig(client, guildId) {
   try {
     const guildConfig = await getGuildConfig(client, guildId);
-    return guildConfig.leveling || {
-      enabled: true,
-      xpPerMessage: { min: 15, max: 25 },
-      xpCooldown: 20,
-      levelUpMessage: '{user} has leveled up to level {level}!',
-      levelUpChannel: null,
-      ignoredChannels: [],
-      ignoredRoles: [],
-      blacklistedUsers: [],
-      roleRewards: {},
-      announceLevelUp: true,
-      xpMultiplier: 1
+    const stored = guildConfig?.leveling;
+
+    return {
+      ...DEFAULT_LEVELING_CONFIG,
+      ...(stored && typeof stored === 'object' ? stored : {}),
+      xpRange: {
+        ...DEFAULT_LEVELING_CONFIG.xpRange,
+        ...(stored?.xpRange && typeof stored.xpRange === 'object' ? stored.xpRange : {}),
+      },
+      xpPerMessage: {
+        ...DEFAULT_LEVELING_CONFIG.xpPerMessage,
+        ...(stored?.xpPerMessage && typeof stored.xpPerMessage === 'object' ? stored.xpPerMessage : {}),
+      },
+      ignoredChannels: Array.isArray(stored?.ignoredChannels) ? stored.ignoredChannels : [],
+      ignoredRoles: Array.isArray(stored?.ignoredRoles) ? stored.ignoredRoles : [],
+      blacklistedUsers: Array.isArray(stored?.blacklistedUsers) ? stored.blacklistedUsers : [],
+      roleRewards: stored?.roleRewards && typeof stored.roleRewards === 'object' ? stored.roleRewards : {},
     };
   } catch (error) {
     logger.error(`Error getting leveling config for guild ${guildId}:`, error);
     return {
-      enabled: true,
-      xpPerMessage: { min: 15, max: 25 },
-      xpCooldown: 20,
-      levelUpMessage: '{user} has leveled up to level {level}!',
-      levelUpChannel: null,
+      ...DEFAULT_LEVELING_CONFIG,
+      xpRange: { ...DEFAULT_LEVELING_CONFIG.xpRange },
+      xpPerMessage: { ...DEFAULT_LEVELING_CONFIG.xpPerMessage },
       ignoredChannels: [],
       ignoredRoles: [],
       blacklistedUsers: [],
       roleRewards: {},
-      announceLevelUp: true,
-      xpMultiplier: 1
     };
   }
 }

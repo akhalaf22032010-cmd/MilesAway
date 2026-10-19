@@ -21,14 +21,20 @@ export default {
         const goodbyeChannelId = welcomeConfig?.goodbyeChannelId;
 
         if (welcomeConfig?.goodbyeEnabled && goodbyeChannelId) {
-            const channel = guild.channels.cache.get(goodbyeChannelId);
+            let channel = guild.channels.cache.get(goodbyeChannelId);
+            if (!channel) {
+                try {
+                    channel = await guild.channels.fetch(goodbyeChannelId);
+                } catch (error) {
+                    logger.warn(`[Goodbye] Could not fetch configured channel ${goodbyeChannelId} in guild ${guild.id}:`, error.message);
+                }
+            }
             if (channel?.isTextBased?.()) {
                 const me = guild.members.me;
                 const permissions = me ? channel.permissionsFor(me) : null;
                 if (!permissions?.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages])) {
-                    return;
-                }
-
+                    logger.warn(`[Goodbye] Missing View Channel/Send Messages permission in channel ${goodbyeChannelId} for guild ${guild.id}; skipping only the goodbye message.`);
+                } else {
                 const formatData = { user, guild, member };
                 const goodbyeMessage = formatWelcomeMessage(
                     welcomeConfig.leaveMessage || welcomeConfig.leaveEmbed?.description || botConfig.welcome?.defaultGoodbyeMessage || '{user} has left the server.',
@@ -74,6 +80,7 @@ export default {
                         allowedMentions: welcomeConfig?.goodbyePing ? { users: [user.id] } : { parse: [] },
                         embeds: [embed]
                     });
+                }
                 }
             }
         }

@@ -23,7 +23,14 @@ export default {
         const welcomeChannelId = welcomeConfig?.channelId;
 
         if (welcomeConfig?.enabled && welcomeChannelId) {
-            const channel = guild.channels.cache.get(welcomeChannelId);
+            let channel = guild.channels.cache.get(welcomeChannelId);
+            if (!channel) {
+                try {
+                    channel = await guild.channels.fetch(welcomeChannelId);
+                } catch (error) {
+                    logger.warn(`[Welcome] Could not fetch configured channel ${welcomeChannelId} in guild ${guild.id}:`, error.message);
+                }
+            }
             const me = guild.members.me;
             const permissions = channel?.isTextBased?.() && me ? channel.permissionsFor(me) : null;
             // Skip only the welcome message if permissions are missing; the rest of the

@@ -80,7 +80,7 @@ export default {
       }
       messages[name] = { title, subtitle, content, images: imageUrls, videos: videoUrls, createdBy: interaction.user.id, updatedAt: Date.now() };
       await saveMessages(client, interaction.guildId, messages);
-      return interaction.reply({ content: `Saved custom message **.${name}**. Use `/custom send name:${name}` to post it.`, flags: MessageFlags.Ephemeral });
+      return interaction.reply({ content: 'Saved custom message **.' + name + '**. Use `/custom send name:' + name + '` to post it.', flags: MessageFlags.Ephemeral });
     }
 
     if (sub === 'list') {
@@ -97,7 +97,7 @@ export default {
     }
 
     const entry = messages[name];
-    if (!entry) return interaction.reply({ content: `I couldn't find **.${name}**. Use `/custom list` to see saved messages.`, flags: MessageFlags.Ephemeral });
+    if (!entry) return interaction.reply({ content: 'I couldn\'t find **.' + name + '**. Use `/custom list` to see saved messages.', flags: MessageFlags.Ephemeral });
 
     const embeds = buildEmbeds(entry);
     for (const image of (entry.images || []).slice(0, 10 - embeds.length)) {

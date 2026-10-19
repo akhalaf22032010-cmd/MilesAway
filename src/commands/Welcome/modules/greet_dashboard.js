@@ -176,14 +176,6 @@ export default {
             const guildId = interaction.guild.id;
             const cfg = await getWelcomeConfig(client, guildId);
 
-            if (!cfg.channelId && !cfg.goodbyeChannelId) {
-                throw new TitanBotError(
-                    'Greet system not configured',
-                    ErrorTypes.CONFIGURATION,
-                    'Neither Welcome nor Goodbye has been set up yet. Run `/welcome setup` or `/goodbye setup` first.',
-                );
-            }
-
             await InteractionHelper.safeDefer(interaction, { flags: MessageFlags.Ephemeral });
             if (!interaction.deferred) {
                 return;

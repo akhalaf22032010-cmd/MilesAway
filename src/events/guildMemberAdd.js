@@ -85,25 +85,50 @@ export default {
             }
         }
         
-        if (welcomeConfig?.roleIds && welcomeConfig.roleIds.length > 0) {
-            const delay = welcomeConfig.autoRoleDelay || 0;
-            const singleRoleId = welcomeConfig.roleIds[0];
-            
-            if (delay > 0) {
-                const timeout = setTimeout(async () => {
-                    const role = guild.roles.cache.get(singleRoleId);
-                    if (role) {
-                        await assignRoleSafely(member, role);
+        // Auto-role is stored in the welcome config. Fetch it from Discord rather
+        // than relying on cache, which can be empty after restarts or cache misses.
+        const autoRoleIds = Array.isArray(welcomeConfig?.roleIds)
+            ? welcomeConfig.roleIds.filter(Boolean)
+            : [];
+        const autoRoleId = autoRoleIds[0]; // This bot intentionally supports one auto-role.
+        if (autoRoleId) {
+            const assignConfiguredRole = async () => {
+                try {
+                    // A delayed role should not be assigned if the member has already left.
+                    const currentMember = guild.members.cache.get(member.id)
+                        || await guild.members.fetch(member.id).catch(() => null);
+                    if (!currentMember) {
+                        logger.info(`[Autorole] Skipped role ${autoRoleId}: member ${member.id} is no longer in guild ${guild.id}.`);
+                        return;
                     }
-                }, delay * 1000);
-                if (typeof timeout.unref === 'function') {
-                    timeout.unref();
+
+                    let role = guild.roles.cache.get(autoRoleId);
+                    if (!role) {
+                        role = await guild.roles.fetch(autoRoleId).catch(error => {
+                            logger.warn(`[Autorole] Could not fetch configured role ${autoRoleId} in guild ${guild.id}:`, error.message);
+                            return null;
+                        });
+                    }
+                    if (!role) {
+                        logger.warn(`[Autorole] Configured role ${autoRoleId} does not exist in guild ${guild.id}.`);
+                        return;
+                    }
+
+                    await assignRoleSafely(currentMember, role);
+                } catch (error) {
+                    logger.error(`[Autorole] Unexpected failure assigning role ${autoRoleId} in guild ${guild.id}:`, error);
                 }
+            };
+
+            const delaySeconds = Math.max(0, Number(welcomeConfig.autoRoleDelay) || 0);
+            if (delaySeconds > 0) {
+                const timeout = setTimeout(() => {
+                    void assignConfiguredRole();
+                }, delaySeconds * 1000);
+                if (typeof timeout.unref === 'function') timeout.unref();
+                logger.info(`[Autorole] Scheduled role ${autoRoleId} for member ${member.id} in ${delaySeconds}s.`);
             } else {
-                const role = guild.roles.cache.get(singleRoleId);
-                if (role) {
-                    await assignRoleSafely(member, role);
-                }
+                await assignConfiguredRole();
             }
         }
         
@@ -197,9 +222,29 @@ async function handleVerification(member, guild, verificationConfig, client) {
 }
 
 async function assignRoleSafely(member, role) {
+    const { guild } = member;
     try {
-        await member.roles.add(role);
+        const botMember = guild.members.me || await guild.members.fetchMe();
+        if (!botMember.permissions.has(PermissionFlagsBits.ManageRoles)) {
+            logger.warn(`[Autorole] Cannot assign role ${role.id} in guild ${guild.id}: bot is missing Manage Roles permission.`);
+            return false;
+        }
+
+        if (role.managed || role.id === guild.id) {
+            logger.warn(`[Autorole] Cannot assign managed/@everyone role ${role.id} in guild ${guild.id}.`);
+            return false;
+        }
+
+        if (role.position >= botMember.roles.highest.position) {
+            logger.warn(`[Autorole] Cannot assign role ${role.id} in guild ${guild.id}: move the bot's highest role above this role.`);
+            return false;
+        }
+
+        await member.roles.add(role, 'Automatic role on member join');
+        logger.info(`[Autorole] Assigned role ${role.id} to member ${member.id} in guild ${guild.id}.`);
+        return true;
     } catch (error) {
-        logger.warn(`Failed to assign role ${role.id} to member ${member.id}:`, error);
+        logger.warn(`[Autorole] Failed to assign role ${role.id} to member ${member.id} in guild ${guild.id}: ${error.message}`);
+        return false;
     }
 }

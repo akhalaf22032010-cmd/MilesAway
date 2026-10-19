@@ -82,6 +82,8 @@ export const commandAliases = {
     'greet': 'greet',
     'goodbye': 'goodbye',
     'autorole': 'autorole',
+    'custom': 'custom',
+    'cm': 'custom',
 
     'calc': 'calculate',
     'math': 'calculate',

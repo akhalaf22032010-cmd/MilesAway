@@ -10,7 +10,9 @@ const DNR_GIFS = [
   'https://klipy.com/gifs/dnr-didnt-read',
   'https://klipy.com/gifs/dnr-dnrd',
   'https://klipy.com/gifs/loox-androgenicogre-2',
-  'https://klipy.com/gifs/dnr-7'
+  'https://klipy.com/gifs/dnr-7',
+  'https://klipy.com/gifs/dnr-didnt-read',
+  'https://klipy.com/gifs/nutria-dnr'
 ];
 
 async function resolveKlipyGifUrl(pageUrl) {
@@ -183,7 +185,7 @@ export default {
 
     const embed = dnrEmbed(
       '# 📌 USER DNRD',
-      `**${actorName} DNRED ${displayName}**\n\n**Reason:** ${reason}\n\n**They won't be able to ping/reply to you**`,
+      `**${actorName} DNRED ${displayName}**\n\n**Reason:** ${reason}\n\n**They won't be able to ping or reply to you**`,
       gifAttachment ? 'attachment://dnr.gif' : null,
     );
 
